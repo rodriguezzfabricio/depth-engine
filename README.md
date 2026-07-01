@@ -23,19 +23,19 @@ Anyone with an AI coding agent and a goal they want approached with real rigor i
 
 ## Install & scaffold
 
-This is a **private** package. Once it's on a registry you can use `npx`:
+This is a **private** repo shared with invited collaborators. Accept the GitHub invite, clone it, then run its `init` inside whatever project you want to scaffold:
 
 ```bash
-npx depth-engine init          # inside your project directory
+git clone https://github.com/endegenaassefa/depth-engine.git
+
+# then, inside YOUR project's directory:
+node /path/to/depth-engine/bin/depth-engine.js init
+
+# or install the command once so you can call it anywhere:
+npm install -g /path/to/depth-engine   &&   depth-engine init
 ```
 
-Until then, from a local clone:
-
-```bash
-git clone <your-remote>/depth-engine
-node depth-engine/bin/depth-engine.js init      # run inside your project dir
-# or install it once:  npm install -g ./depth-engine  &&  depth-engine init
-```
+No dependencies to install — the CLI is pure Node (≥18). If the maintainer later publishes it to a registry, `npx depth-engine init` will work too.
 
 `init` is **non-destructive and idempotent** — it only writes into a `depth-engine/` folder in your project, never overwrites your files, and never overwrites an in-progress run's memory. Safe to re-run.
 
