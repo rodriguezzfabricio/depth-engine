@@ -18,9 +18,10 @@ function listAssetFiles() {
 }
 
 // A file under memory/ is "sacrosanct" — the running engine writes its state
-// there, so init must never overwrite it (even with --force).
+// there, so init must never overwrite it (even with --force). Case-insensitive
+// so a mis-cased asset can't slip past this on a case-insensitive filesystem.
 function isMemoryFile(relPath) {
-  return relPath.split(path.sep)[0] === 'memory';
+  return relPath.split(path.sep)[0].toLowerCase() === 'memory';
 }
 
 module.exports = { ASSETS_DIR, listAssetFiles, isMemoryFile };

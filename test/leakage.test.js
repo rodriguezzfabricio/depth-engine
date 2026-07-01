@@ -7,9 +7,11 @@ const ASSETS = path.join(__dirname, '..', 'assets');
 const PROTO = path.join(ASSETS, 'protocols');
 const ENGINE = path.join(ASSETS, 'engine');
 
-// Hard-domain tokens that must NEVER appear in a genericized discipline protocol.
-// Chosen to have zero false-positive risk in generic prose (no bare "maker"/"checkout").
-const DOMAIN = /kalshi|becker|backtest|shopify|subreddit|instagram|fees\.py|e3_q0251|¢|ceil\(0\.0|\bbuy-no\b|taker\/maker|maker\/taker|e-?commerce/i;
+// Hard-domain tokens that must NEVER appear in a genericized discipline protocol
+// (or in BOOT / memory). Broadened after a cross-family review to cover trading
+// and e-commerce vocabulary — but deliberately excludes over-generic words that
+// appear in legitimate generic examples (payment, cart, checkout, shipping).
+const DOMAIN = /kalshi|becker|backtest|shopify|subreddit|instagram|fees\.py|e3_q0251|¢|ceil\(0\.0|\bbuy-no\b|taker\/maker|maker\/taker|maker-taker|e-?commerce|\btrading\b|prediction market|order.?book|\bmarket maker\b|storefront|merchant|\bSKU\b|\bPDP\b|limit order/i;
 
 // The mission's e-commerce/fixture grep for the engine: allowed ONLY inside <example> blocks.
 const ECOM = /e-?commerce|instagram|subreddit|mobile-first|checkout|shopify|\bcart\b|coffee/i;
@@ -32,19 +34,13 @@ function walk(dir) {
   return out;
 }
 
-// Line numbers (1-based) that fall inside an <example>...</example> region.
-function exampleLines(text) {
-  const inside = new Set();
-  let depth = 0;
-  text.split('\n').forEach((l, i) => {
-    const opens = (l.match(/<example>/g) || []).length;
-    const closes = (l.match(/<\/example>/g) || []).length;
-    if (depth > 0) inside.add(i + 1);
-    depth += opens;
-    if (depth > 0) inside.add(i + 1);
-    depth -= closes;
-  });
-  return inside;
+// Blank out the contents of every CLOSED <example>...</example> span, preserving
+// line count so file:line reporting stays accurate. A term is exempt ONLY if it
+// sits inside a properly-closed block. Content beside inline tags on the same
+// line, and anything following a dangling (unclosed) <example>, is NOT exempt —
+// closing the same-line and unbalanced-tag bypasses.
+function blankExamples(text) {
+  return text.replace(/<example>[\s\S]*?<\/example>/g, (m) => m.replace(/[^\n]/g, ' '));
 }
 
 test('all 5 protocols present and free of domain leakage', () => {
@@ -66,14 +62,26 @@ test('non-engine shipped assets (BOOT, memory) have zero domain leakage', () => 
   }
 });
 
-test('engine e-commerce/fixture terms appear only inside <example> blocks', () => {
+test('engine e-commerce/fixture terms appear only inside closed <example> blocks', () => {
   for (const file of walk(ENGINE)) {
-    const text = fs.readFileSync(file, 'utf8');
-    const ex = exampleLines(text);
-    text.split('\n').forEach((l, i) => {
-      if (ECOM.test(l)) {
-        assert.ok(ex.has(i + 1), `${path.relative(ASSETS, file)}:${i + 1} e-commerce leak outside <example>: ${l.trim()}`);
-      }
+    const scrubbed = blankExamples(fs.readFileSync(file, 'utf8'));
+    scrubbed.split('\n').forEach((l, i) => {
+      assert.ok(!ECOM.test(l), `${path.relative(ASSETS, file)}:${i + 1} e-commerce leak outside <example>: ${l.trim()}`);
     });
   }
+});
+
+test('blankExamples resists same-line and unbalanced-tag bypasses', () => {
+  // content beside an inline empty block stays visible (same-line bypass closed)
+  assert.match(blankExamples('real checkout leak <example></example>'), /checkout/);
+  assert.match(blankExamples('<example></example> real cart leak'), /cart/);
+  // a dangling <example> (no close) exempts nothing that follows it
+  assert.match(blankExamples('intro <example> then checkout with no close'), /checkout/);
+  // a genuine multi-line block IS blanked, surrounding text preserved, line count intact
+  const block = 'before\n<example>\ncheckout inside\n</example>\nafter';
+  const scrubbed = blankExamples(block);
+  assert.doesNotMatch(scrubbed, /checkout/);
+  assert.match(scrubbed, /before/);
+  assert.match(scrubbed, /after/);
+  assert.strictEqual(block.split('\n').length, scrubbed.split('\n').length);
 });

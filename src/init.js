@@ -8,6 +8,10 @@ const { ASSETS_DIR, listAssetFiles, isMemoryFile } = require('./files');
 //   skip-exists — target differs; protected (memory) or not --force → leave it
 //   update      — target differs, framework file, --force → refresh it
 function planFile(srcAbs, destAbs, relPath, force) {
+  // Never write THROUGH a symlinked destination — a symlinked framework file
+  // (e.g. depth-engine/BOOT.md -> memory/STATE.md) must not let a --force copy
+  // clobber its target. Treat any symlinked destination as protected.
+  if (fs.existsSync(destAbs) && fs.lstatSync(destAbs).isSymbolicLink()) return 'skip-exists';
   if (!fs.existsSync(destAbs)) return 'create';
   if (fs.readFileSync(srcAbs).equals(fs.readFileSync(destAbs))) return 'unchanged';
   if (isMemoryFile(relPath)) return 'skip-exists'; // memory is never overwritten

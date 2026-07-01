@@ -27,6 +27,19 @@ test('CLI --version prints the package version', () => {
 });
 
 test('CLI unknown command exits non-zero', () => {
-  const d = tmp();
   assert.throws(() => execFileSync('node', [BIN, 'frobnicate'], { encoding: 'utf8', stdio: 'pipe' }));
+});
+
+test('CLI --dir with missing value errors (does not silently target cwd)', () => {
+  assert.throws(() => execFileSync('node', [BIN, 'init', '--dir'], { encoding: 'utf8', stdio: 'pipe' }));
+});
+
+test('CLI --dir --force (flag mistaken as value) errors, no "--force" dir created', () => {
+  assert.throws(() => execFileSync('node', [BIN, 'init', '--dir', '--force'], { encoding: 'utf8', stdio: 'pipe' }));
+});
+
+test('CLI --dir=<path> form is honored', () => {
+  const d = tmp();
+  execFileSync('node', [BIN, 'init', `--dir=${d}`], { encoding: 'utf8' });
+  assert.ok(fs.existsSync(path.join(d, 'depth-engine', 'BOOT.md')));
 });

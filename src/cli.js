@@ -31,8 +31,24 @@ function run(argv) {
   }
 
   const force = args.includes('--force');
+  let targetDir = process.cwd();
+  const eq = args.find((a) => a.startsWith('--dir='));
   const di = args.indexOf('--dir');
-  const targetDir = di >= 0 && args[di + 1] ? path.resolve(args[di + 1]) : process.cwd();
+  if (eq) {
+    const v = eq.slice('--dir='.length);
+    if (!v) {
+      console.error('depth-engine: --dir requires a path (e.g. --dir=./my-project).');
+      return 1;
+    }
+    targetDir = path.resolve(v);
+  } else if (di >= 0) {
+    const v = args[di + 1];
+    if (!v || v.startsWith('-')) {
+      console.error('depth-engine: --dir requires a path value (e.g. --dir ./my-project).');
+      return 1;
+    }
+    targetDir = path.resolve(v);
+  }
 
   try {
     const r = init(targetDir, { force });

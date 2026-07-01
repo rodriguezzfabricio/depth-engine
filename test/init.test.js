@@ -20,12 +20,28 @@ test('init creates the full payload', () => {
   assert.ok(r.created.length > 25, `expected >25 created, got ${r.created.length}`);
 });
 
-test('init is idempotent (second run creates nothing)', () => {
+test('init is idempotent (second run creates/updates/skips nothing)', () => {
   const d = tmp();
   init(d);
   const r2 = init(d);
   assert.strictEqual(r2.created.length, 0);
+  assert.strictEqual(r2.updated.length, 0);
+  assert.strictEqual(r2.skipped.length, 0);
   assert.ok(r2.unchanged.length > 25);
+});
+
+test('a symlinked framework destination is never written through (memory stays safe)', () => {
+  const d = tmp();
+  init(d);
+  const boot = path.join(DE(d), 'BOOT.md');
+  const state = path.join(DE(d), 'memory', 'STATE.md');
+  fs.writeFileSync(state, 'PROTECTED RUN STATE');
+  fs.rmSync(boot);
+  fs.symlinkSync(state, boot); // BOOT.md -> memory/STATE.md
+  const r = init(d, { force: true });
+  assert.strictEqual(fs.readFileSync(state, 'utf8'), 'PROTECTED RUN STATE');
+  assert.ok(fs.lstatSync(boot).isSymbolicLink(), 'symlink should be left intact');
+  assert.ok(r.skipped.includes('BOOT.md'));
 });
 
 test('memory files are never overwritten, even with --force', () => {
