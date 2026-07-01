@@ -1,0 +1,29 @@
+{
+  "name": "depth-engine",
+  "version": "0.1.0",
+  "description": "A rigor engine your AI coding agent walks to turn a loose seed into a build-ready scaffold, a decision, or an honest refusal.",
+  "private": true,
+  "license": "UNLICENSED",
+  "bin": {
+    "depth-engine": "bin/depth-engine.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "assets/",
+    "src/",
+    "bin/",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "docs/CONCEPTS.md",
+    "docs/GETTING-STARTED.md",
+    "docs/USAGE.md",
+    "docs/EXAMPLES.md",
+    "docs/FAQ.md"
+  ]
+}
