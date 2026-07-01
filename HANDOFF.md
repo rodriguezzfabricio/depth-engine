@@ -40,8 +40,13 @@ a worktree of the source engine.
    - To a **private registry**: set `publishConfig.registry` (and an npm scope if the registry
      needs one), remove or override `"private": true`, then `npm publish`.
    - You run the actual `npm publish` (or provide credentials). Nothing here publishes on its own.
-2. **Remote + visibility.** This is a local git repo at `/root/depth-engine` on `main`, tagged
-   `v0.1.0`. Push it to a **private** remote when ready (`git remote add origin … && git push -u origin main --tags`).
+2. **Remote + collaborators.** ✅ Pushed to the **private** repo
+   **https://github.com/endegenaassefa/depth-engine** (`main` + tag `v0.1.0`). To let someone
+   use it, invite them as a collaborator: repo **Settings → Collaborators**
+   (https://github.com/endegenaassefa/depth-engine/settings/access), or
+   `gh api --method PUT /repos/endegenaassefa/depth-engine/collaborators/<username> -f permission=pull`
+   (read access — enough to clone + run `init`; use `permission=push` if they'll contribute).
+   They then clone and run `init` per the README.
 3. **Name/scope.** Ships as unscoped `depth-engine` (verified available on npm). If you later
    want a scope (e.g. `@yourorg/depth-engine`), update `package.json` `name` before publishing.
 
