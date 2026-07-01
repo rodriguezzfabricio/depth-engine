@@ -57,6 +57,15 @@ test('all 5 protocols present and free of domain leakage', () => {
   }
 });
 
+test('non-engine shipped assets (BOOT, memory) have zero domain leakage', () => {
+  const files = [path.join(ASSETS, 'BOOT.md'), ...walk(path.join(ASSETS, 'memory'))];
+  for (const file of files) {
+    fs.readFileSync(file, 'utf8').split('\n').forEach((l, i) => {
+      assert.ok(!DOMAIN.test(l), `${path.relative(ASSETS, file)}:${i + 1} domain leakage: ${l.trim()}`);
+    });
+  }
+});
+
 test('engine e-commerce/fixture terms appear only inside <example> blocks', () => {
   for (const file of walk(ENGINE)) {
     const text = fs.readFileSync(file, 'utf8');

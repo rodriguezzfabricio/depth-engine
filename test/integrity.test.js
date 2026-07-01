@@ -36,3 +36,25 @@ test('INITIATOR stage/law pointers resolve within assets/engine', () => {
     assert.ok(fs.existsSync(path.join(ENGINE, ref)), `dangling ref: ${ref}`);
   }
 });
+
+test('BOOT.md present and its internal pointers resolve', () => {
+  const boot = path.join(ASSETS_ROOT, 'BOOT.md');
+  assert.ok(fs.existsSync(boot), 'missing BOOT.md');
+  const txt = fs.readFileSync(boot, 'utf8');
+  const refs = [...txt.matchAll(/`((?:engine|protocols|memory)\/[^`\s]+\.md)`/g)].map(m => m[1]);
+  assert.ok(refs.length >= 5, `BOOT should point at engine/protocols/memory files, got ${refs.length}`);
+  for (const ref of new Set(refs)) {
+    assert.ok(fs.existsSync(path.join(ASSETS_ROOT, ref)), `BOOT dangling ref: ${ref}`);
+  }
+});
+
+test('5 genericized protocols present', () => {
+  const protos = fs.readdirSync(path.join(ASSETS_ROOT, 'protocols')).filter(f => f.endsWith('.md'));
+  assert.strictEqual(protos.length, 5);
+});
+
+test('4 zeroed memory files present', () => {
+  for (const f of ['LEDGER.md', 'STATE.md', 'INDEX.md', 'REGISTER.md']) {
+    assert.ok(fs.existsSync(path.join(ASSETS_ROOT, 'memory', f)), `missing memory/${f}`);
+  }
+});
