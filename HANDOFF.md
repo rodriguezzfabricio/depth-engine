@@ -18,14 +18,18 @@ a worktree of the source engine.
 - **Discipline suite, genericized** — 5 protocols, all domain content removed, discipline
   preserved. Leakage-clean under CI (`test/leakage.test.js`).
 - **BOOT.md + zeroed 3-tier memory** — the single agent-entry file + Ledger/State/Index/Register.
-- **Tests: 21 passing** — init (drop / idempotent / non-destructive / memory-protected),
-  structural integrity (12 stages + 5 laws + 5 protocols + BOOT + memory; pointers resolve),
-  leakage gate (protocols 0 domain hits; engine e-commerce only in `<example>`).
+- **Tests: 26 passing** — init (drop / idempotent / non-destructive / memory-protected /
+  symlink-safe), structural integrity (12 stages + 5 laws + 5 protocols + BOOT + memory;
+  pointers resolve), leakage gate (protocols 0 domain hits under a broadened regex; engine
+  e-commerce only inside closed `<example>` blocks), CLI arg robustness.
 - **Verified end-to-end on the packed artifact** — `npm pack` → install into a clean consumer →
   `npx depth-engine init` → 30 files land; idempotent re-run; `memory/` preserved even under
   `--force`; leakage-clean on the installed copy.
 - **Independent cross-check** — the CLI was adversarially challenged by a different model family
-  (Codex CLI), the engine's own L-A discipline applied to itself.
+  (Codex CLI), the engine's own L-A discipline applied to itself. Real findings (symlink/case
+  bypass of memory-protection, `--dir` footguns, a gameable leakage detector) were fixed via
+  TDD; one finding was verified as a false positive (the permitted "Kalshi referent" origin
+  section) and correctly rejected.
 - **Docs** — README, CONCEPTS, GETTING-STARTED, USAGE, EXAMPLES, FAQ, CONTRIBUTING, CHANGELOG.
 - **CI** — `.github/workflows/ci.yml` runs the suite on Node 20.
 
