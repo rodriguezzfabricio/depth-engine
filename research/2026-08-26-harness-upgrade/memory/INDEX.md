@@ -31,3 +31,6 @@
 | L-0025 | 2026-08-26 | correction | X-010 self-correction: L-A mapping is article-grade, the other four are lecture-grade |
 | L-0026 | 2026-08-26 | decision | E8 re-converged after source correction; REPORT revised to v2 |
 | L-0027 | 2026-08-26 | correction | Instrument bug: naive `grep -c '^L-0'` miscounts the Ledger; parse the record, not the line |
+| L-0028 | 2026-08-26 | correction | X-013 WITHDRAWN: temperature is not settable (400 error on these models); what survives is stronger and shrinks the plan |
+| L-0029 | 2026-08-26 | finding | Leverage audit of T12: majority of the lecture is unusable; 1 defect find, 1 lint, rest is understanding |
+| L-0030 | 2026-08-26 | finding | Conflict check vs M1-M8 and D1: no conflicts; M8 corrected, D1 gets smaller not larger; 2 new rules still need D1's gate |

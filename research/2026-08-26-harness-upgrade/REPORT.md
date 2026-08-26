@@ -15,7 +15,7 @@
 3. **The lecture gives you mechanism where the article gave you vocabulary.** Four of the Depth Engine's five laws now have a stated mechanical cause instead of an assertion. §5 is the core of this report.
 4. **Your F1 complaint has an exact mechanical explanation, and it kills the current E8 design.** The softmax at every step is a full probability distribution over all ~250,000 tokens, non-negative and summing to one. There is no null option in it. So a gate phrased as "can the model think of another question?" has no false branch. It is not a hard gate. It is a gate with the *no* wire cut. §5.1.
 5. **Four errors in your pasted session summary survive from v1**, two of them load-bearing enough to change your build list. §4.
-6. **The lecture hands you a control the engine does not mention once: temperature.** Running a verification pass and a brainstorming pass at the same temperature is a category error, and re-running a check at temperature above zero and getting the same answer is not corroboration. §6.
+6. **The lecture explains randomness, and then the platform takes the knob away.** Temperature cannot be set on the models you use: any value except 1.0 returns a 400 error, and Claude Code exposes no setting for it at all. You cannot make a model run reproducible. That makes re-running a check and getting the same answer worthless as evidence, and it promotes mechanical checks from "cheapest tier" to "only reproducible tier." §6.
 7. **The most valuable thing in 2.5 hours is a Stanford professor saying "nobody really knows" six times** while teaching frontier architecture. §7.
 
 ---
@@ -226,13 +226,24 @@ and above one:
 
 There is also top-k: keep only the k most likely tokens, drop the rest, renormalize.
 
-Three consequences for the engine, none of which appear in any of your 57 spec files:
+### Correction: you cannot set it. I checked after recommending it.
 
-**One. Different stages want different temperatures, and using one setting everywhere is a category error.** E6's question battery and E8's adversarial generation pass genuinely want diversity, which is higher temperature. E7's deterministic checks, any parser, and any verification pass want reproducibility, which is temperature zero. Right now they all run at whatever the session default is.
+Revision v2 of this report told you to set temperature per stage and listed it as a Tier 1 item. **That was wrong, and I did not check the harness before recommending it, which is the exact failure §8 tells you to avoid.** Checked now:
 
-**Two, and this is a real bug in the M8 verification design: re-running a check at temperature above zero and getting the same answer is not corroboration.** Two samples from one distribution agreeing tells you the distribution is peaked. It tells you nothing about whether the peak is in the right place. If your blind-panel tier is meant to be independent evidence, the independence has to come from a different lens or a different model, never from resampling.
+- The Claude Code settings documentation contains **zero** occurrences of `temperature`, `top_p`, `top_k`, or `sampling`. There is no such setting.
+- At the API level the parameters are deprecated on the models you use. Verbatim: *"Models released after Claude Opus 4.6 do not support setting temperature. A value of 1.0 will be accepted for backwards compatibility, all other values will be rejected with a 400 error."* `top_k` is worse: *"any value will be rejected with a 400 error."*
 
-**Three, it sharpens the Tier 0 rule.** Anything executable should be executed, and executing is deterministic by nature. Anything opined should be labeled with the temperature it was opined at.
+So the knob does not exist. The recommendation is withdrawn and Tier 1 item 4 is deleted.
+
+### What survives, and it is stronger than what I withdrew
+
+You cannot turn the randomness off. That is not a missing feature you can work around; it is a fixed property of your environment. Three things follow.
+
+**One. No model-based check is reproducible, ever.** Run the same verification twice and you get two samples from a distribution you have no way to sharpen. If it comes back the same, that tells you the distribution is peaked. It tells you nothing about whether the peak sits in the right place.
+
+**Two, and this is a real defect in M8:** your Tier 1 is "blind panels, fresh instances, each through a different lens." If any part of your design counts *agreement among those panels* as evidence, part of what you are measuring is sampling noise, and **you cannot fix it by lowering temperature, because you cannot lower temperature.** The only real fixes are to make the lenses genuinely different, or to use a different model family, or to move the check out of the model entirely. Never resampling.
+
+**Three, Tier 0 gets promoted for a new reason.** I previously justified mechanical-first as "cheapest and immune to model bias." The stronger justification: **it is the only tier that gives the same answer twice.** A test run, a parser, a `git diff`, a version string read off disk. Those are reproducible. Nothing that goes through the model is, and no configuration will make it so.
 
 ---
 
@@ -399,8 +410,8 @@ Ranked by verified evidence over effort. Each names the check that makes it fail
 **3. Put `maxTurns` on every subagent.** Reading agents get small numbers.
 *Fail-closed check:* the platform enforces it; the agent cannot raise its own cap. *Closes:* the runaway half of F1 and F2. *Effort:* minutes.
 
-**4. Set temperature per stage.** Temperature 0 for E7 verification, all parsers, and every mechanical check. Higher for E6 generation and E8 adversarial passes. Record the temperature next to every opinion-tier verdict.
-*Fail-closed check:* a lint that rejects a verification record with no temperature field, and rejects any verification recorded above 0. *Closes:* the reproducibility hole in M8. *Effort:* an hour. **New in v2, from §6.**
+**4. ~~Set temperature per stage.~~ WITHDRAWN in v3.** The knob does not exist. Claude Code has no temperature setting and the API rejects any value but 1.0 with a 400 error on these models. See §6. What replaces it is not a build item, it is a deletion: **remove any part of M8 that treats agreement between repeated same-model runs as evidence.** That is a rule to delete, not code to write.
+*Effort:* zero, it makes the plan smaller.
 
 **5. Add a target-confirmation gate to E0/E1.** Restate the artifact you are about to analyze and get a yes before spending a research pass on it.
 *Fail-closed check:* E1 cannot produce `intent_brief.md` without a confirmed target line. *Closes:* the failure this run committed. *Effort:* minutes. **New in v2, from §1.**
@@ -490,6 +501,7 @@ Ordered by effect on your actual work.
 | X-010 | All five law mappings rest on equal evidence | **False.** Four are lecture-grade; L-A (§5.5) is article-grade because the lecture never reaches RLHF. Flagged rather than smoothed. |
 | X-011 | "A model can always emit one more objection" | **Upgraded from analogy to mechanism.** The softmax is always a normalized distribution over all ~250,000 tokens with no null entry, so the gate has no false branch. |
 | X-012 | The video is one lecture | **False.** Two, stitched in reverse course order: LLMs first, then the prerequisite neural-nets lecture. |
+| X-013 | "Set temperature per stage" (this report, v2) | **False and withdrawn. This report's own error.** Claude Code has no temperature setting; the API rejects any value but 1.0 with a 400 error on these models, and rejects `top_k` outright. I recommended a knob without checking the harness, which is the failure §8 exists to prevent. What survives is stronger: randomness cannot be turned off, so no model check is reproducible, and Tier 0 is the only reproducible tier. |
 
 **Sources.**
 Primary: the video transcript (`source_T12_stanford_lecture_transcript.txt`, this repo) · [CS229 lecture notes](https://cs229.stanford.edu/main_notes.pdf) · [Subagents](https://code.claude.com/docs/en/sub-agents) · [Hooks](https://code.claude.com/docs/en/hooks) · [Model configuration](https://code.claude.com/docs/en/model-config) · [Monitoring usage](https://code.claude.com/docs/en/monitoring-usage) · [Error reference](https://code.claude.com/docs/en/errors) · [Models, usage, and limits in Claude Code](https://support.claude.com/en/articles/14552983-models-usage-and-limits-in-claude-code)

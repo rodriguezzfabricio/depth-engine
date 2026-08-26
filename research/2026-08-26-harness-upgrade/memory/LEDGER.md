@@ -548,3 +548,99 @@ scope assumed, not confirmed), S10 (no cross-family path on this host), S11
 small.en transcription instrument, and audio-only capture losing all board
 work in a heavily visual lecture.
 Route: E11 Route B. REPORT.md revised to v2 and pushed.
+
+L-0028
+Date: 2026-08-26
+Type: correction
+X-013. THIS RUN'S OWN RECOMMENDATION WAS WRONG AND IS WITHDRAWN.
+REPORT v2 section 6 and Tier-1 item 4 told the operator to "set temperature
+per stage": tau=0 for verification and parsers, higher for E6/E8 generation.
+That knob DOES NOT EXIST in this environment.
+Evidence, checked only after the operator pushed back:
+ - code.claude.com/docs/en/settings contains ZERO occurrences of
+   temperature, top_p, top_k, or sampling. No such setting.
+ - platform.claude.com/docs/en/api/messages, verbatim: "Models released
+   after Claude Opus 4.6 do not support setting temperature. A value of 1.0
+   will be accepted for backwards compatibility, all other values will be
+   rejected with a 400 error." top_p: only >= 0.99 accepted. top_k: "any
+   value will be rejected with a 400 error."
+ROOT CAUSE: L-0012 recorded "read the harness documentation before designing
+any mechanism" as a required protocol step, and then this run designed a
+mechanism from lecture content without running that step. The engine
+identified the rule and did not apply it to itself in the same session. That
+is precisely the spec-gap-vs-implementation-gap distinction from the seed:
+the rule now exists in the ledger and nothing enforced it.
+WHAT SURVIVES, AND IT IS STRONGER THAN WHAT WAS WITHDRAWN:
+ (a) Randomness cannot be turned off. No model-based check is reproducible,
+     by configuration or otherwise.
+ (b) M8 DEFECT CONFIRMED AND HARDENED: any part of the verification law that
+     counts agreement between repeated same-model runs as evidence is
+     measuring sampling noise, and it CANNOT be fixed by lowering
+     temperature. Fixes are: genuinely different lenses, a different model
+     family, or moving the check out of the model. Never resampling.
+ (c) Tier 0 is promoted from "cheapest and bias-immune" to "THE ONLY TIER
+     THAT RETURNS THE SAME ANSWER TWICE."
+NET EFFECT ON THE BUILD: the plan gets SMALLER. One Tier-1 item deleted, one
+M8 sub-rule deleted. No new code.
+
+L-0029
+Date: 2026-08-26
+Type: finding
+LEVERAGE AUDIT of T12, requested by the operator ("can this help or not,
+yes and no and why for both"). Honest accounting of the 2h34m52s source.
+CANNOT BE LEVERAGED (majority of the runtime):
+ - The entire second lecture (~52% of lines): non-linear models, cross-
+   entropy derivation, GD/SGD, ReLU and other activations, ResNet,
+   LayerNorm/RMSNorm, ConvNets, backprop. The operator does not train
+   models. Zero effect on the harness.
+ - Architecture internals in the first lecture: embeddings, Q/K/V
+   projections, multi-head concatenation, masking implementation. Not
+   changeable, not configurable, no build item.
+ - Tokenization and BPE detail. The tokenizer is not the operator's to
+   change.
+ - Temperature and top-k as CONTROLS. See L-0028: not settable.
+CAN BE LEVERAGED, ranked by real effect:
+ 1. M8 defect (L-0023 + L-0028). A rule to DELETE. Highest value.
+ 2. Tier 0 promoted to "only reproducible tier" (L-0028c). Changes ordering
+    justification from preference to necessity.
+ 3. F1 stop-rule mechanism (L-0020). Does NOT change the fix, which the
+    Pocock audit already named. Changes CONVICTION: the operator now knows
+    the old gate could never terminate, so no further passes get spent
+    trying to make it work with better wording.
+ 4. F8 uncertainty lint (L-0024). One small, writable lint: the human brief
+    may not read more confident than its ledger row.
+ 5. L-B / context (L-0022). CONFIRMS a decision already taken from the ACE
+    finding. No new work.
+ 6. L-E and L-C justifications (L-0021, causal masking). Make existing laws
+    defensible. A better argument for a law you already have is not a
+    feature.
+HONEST BOTTOM LINE: the lecture produced ONE defect find, ONE small lint, and
+a large amount of understanding. It did NOT produce a pile of new engine
+features, and anyone claiming 2.5 hours of lecture would rebuild the engine
+was wrong.
+
+L-0030
+Date: 2026-08-26
+Type: finding
+CONFLICT CHECK against the operator's existing M1-M8 and D1 work, requested
+explicitly ("making sure it is not going to get in the way").
+ M1 PM layer          no interaction, plus one optional lint (L-0024)
+ M2 watchdog          no interaction whatsoever
+ M3 routing panel     no interaction whatsoever
+ M4 humanization      REINFORCED; adds the uncertainty lint
+ M5 senior-eng disc.  no interaction
+ M6 repo-aware docs   no interaction
+ M7 good-enough gate  REINFORCED; same fix, mechanical reason (L-0020)
+ M8 verification law  CHANGED: one sub-rule deleted (L-0028b), Tier 0
+                      ordering re-justified (L-0028c). Not a conflict, a
+                      correction inside it.
+ D1 substrate         NO CONFLICT. Nothing here asks for a new mechanism.
+KEY REASSURANCE: three breaker agents are currently prosecuting D1 for
+overbuild with a ten-line-version test on every component. Because this
+run's findings add NO new components and DELETE two rules, they cannot fail
+that test. The lecture makes the enforcement substrate smaller, not larger.
+ONLY RESIDUAL RISK: the two small process gates proposed by this run (the
+E0/E1 target-confirmation gate from L-0016, and the F8 uncertainty lint) are
+still NEW RULES, and D1 states that adding a rule is itself a gated act.
+They must pass D1's own rule-governance gate like anything else. Neither is
+exempt because it came from this run.
