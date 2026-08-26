@@ -8,7 +8,9 @@ Decision-mode run. Rows are the sub-questions the central decision rests on, per
 
 | Item | Type | Status | Evidence (Ledger ID) | Notes |
 |------|------|--------|----------------------|-------|
-| S1. What is the operator's linked source and what does it actually say? | sub-question | closed | L-0005, L-0006 | Long-form X article, not a video. Full text captured. Low provenance, correct structure. |
+| S1. What is the operator's linked source and what does it actually say? | sub-question | closed | L-0016, L-0018, L-0019 | **Re-answered after operator correction.** Real source = T12, Stanford CS229 lecture, 2h34m52s, transcribed locally to 23,459 words. Two lectures stitched in reverse course order. T11 (the article) is its quoted post, demoted to specimen (L-0005, L-0006). |
+| S1b. Was the analyzed artifact the requested artifact? | risk | closed | L-0016 | **No, on the first pass.** The engine verified the artifact's format correctly and never verified it was the right artifact. No law covers this. New E0/E1 gate proposed: restate the target and confirm before researching. |
+| S1c. What does the lecture teach that the article could not? | sub-question | closed | L-0020..L-0024 | Mechanism rather than vocabulary: no-null-entry softmax (F1), NLL objective (L-E), O(T²) attention (L-B), causal masking (L-C), temperature (new), and six expert hedges (F8). |
 | S2. Which claims in the pasted summary survive primary-source checking? | sub-question | closed | L-0007..L-0011 | 4 corrections found (X-003, X-004, X-006, X-002), 2 confirmations (X-005, X-007). All against primary docs. |
 | S3. What is the mechanical cause of F1 (no stopping point)? | sub-question | closed | report §4 L-D row | A next-token predictor can always emit one more plausible objection, so "can I think of another question?" never returns no. Exit must be coverage over a closed list. |
 | S4. What is the mechanical cause of F4 (all-Opus routing)? | sub-question | closed | L-0009 | `model` frontmatter defaults to `inherit`. Structural fix is the env var at the top of the resolution order. |

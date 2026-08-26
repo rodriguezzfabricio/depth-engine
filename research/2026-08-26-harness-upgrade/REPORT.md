@@ -1,337 +1,330 @@
-# Depth Engine: what the source actually said, what your summary got wrong, and what to build next
+# Depth Engine: what the Stanford lecture actually teaches, what your summary got wrong, and what to build next
 
 **Written for:** a software engineering intern who is new to this codebase and to AI internals.
 **Date:** 2026-08-26
 **Run:** `depth-engine/runs/20260826-212321-de-v030-harness-upgrade`
-**Status:** decision-mode deliverable. No engine behavior was changed. One pre-existing code commit was rescued and pushed (details in §9).
+**Revision:** v2. Rewritten after the operator corrected the source. See §1 for what changed and why the mistake is instructive.
+**Status:** decision-mode deliverable. No engine behavior was changed. One pre-existing code commit was rescued and pushed (§10).
 
 ---
 
 ## 0. Read this part if you read nothing else
 
-You asked for three things: run your pasted session summary through the Depth Engine, go through a linked source and pull out what makes the engine better, and write it up plainly.
-
-Here is the compressed version.
-
-1. **The link is not a video.** It is a written X article called "How to Build Your Own LLM: The 5-Step Pipeline Behind GPT & Claude." I read all 2,400 words of it.
-2. **The article is low quality as a source, and that is useful.** It contains four leftover instructions from the AI that wrote it, published by accident, including the sentence "Here's a rewritten version with the same meaning, similar length, and a fresh writing style to reduce similarity." The author never read their own output. That is a live example of the exact problem your F8 complaint names.
-3. **The article's content is still correct and it is worth more to you than it looks.** The five training stages it describes are the mechanical explanation for why every one of the Depth Engine's five laws exists. That connection is the most valuable thing in this report and it is §4.
-4. **I found four errors in your pasted session summary.** Two of them would have made you skip work you actually need. Details in §3. The most expensive one: your summary says Claude Code has "quota auto-resume." It does not.
-5. **Several mechanisms your D1 design plans to build already ship in the platform**, as one-line fields you are not using. Details in §5.
-6. **A private GitHub repo for the engine already existed.** I did not create a second one. I connected your local copy to it and found 141 lines of your own feature code that had never been committed anywhere. That is now pushed. Details in §9.
+1. **The source is a 2 hour 34 minute Stanford CS229 lecture.** I transcribed all of it locally, 23,459 words, and read it end to end. It covers tokenization and BPE, autoregressive modeling, embeddings, softmax and logits, sampling and temperature, the NLL loss, and the Transformer: attention, Q/K/V, causal masking, multi-head, residuals, and normalization.
+2. **My first pass read the wrong source, and the reason matters more than the mistake.** You first gave me the URL of an article. That article turned out to be the *quoted post* inside the real one. I verified that article thoroughly and correctly. I never asked whether it was the right artifact. §1.
+3. **The lecture gives you mechanism where the article gave you vocabulary.** Four of the Depth Engine's five laws now have a stated mechanical cause instead of an assertion. §5 is the core of this report.
+4. **Your F1 complaint has an exact mechanical explanation, and it kills the current E8 design.** The softmax at every step is a full probability distribution over all ~250,000 tokens, non-negative and summing to one. There is no null option in it. So a gate phrased as "can the model think of another question?" has no false branch. It is not a hard gate. It is a gate with the *no* wire cut. §5.1.
+5. **Four errors in your pasted session summary survive from v1**, two of them load-bearing enough to change your build list. §4.
+6. **The lecture hands you a control the engine does not mention once: temperature.** Running a verification pass and a brainstorming pass at the same temperature is a category error, and re-running a check at temperature above zero and getting the same answer is not corroboration. §6.
+7. **The most valuable thing in 2.5 hours is a Stanford professor saying "nobody really knows" six times** while teaching frontier architecture. §7.
 
 ---
 
-## 1. Vocabulary, in plain English
+## 1. What I got wrong on the first pass, and the gate it implies
 
-You are new to this. These words appear constantly in your pasted text and nothing in it defines them. Everything below is defined the way a working engineer would use it, not the way a textbook would.
+You gave me `x.com/RahulKu22532718/status/2073977106447634474`. I checked its format three ways, correctly established it was a long-form article rather than a video, captured all 2,400 words, found four leftover AI authoring instructions in the published text, and wrote a section of analysis on it.
 
-**Model.** A program that takes text in and produces text out. That is genuinely all it does. It has no memory between calls, no ability to run anything, and no access to your files.
+It was the wrong document. It is the post *quoted inside* `x.com/Dhruvkumar16797/status/2092490146793013420`, which is the one you meant. I analyzed the footnote.
 
-**Token.** Models do not read letters or words. Text is chopped into pieces called tokens, usually chunks of words, and each is turned into a number. The model only ever sees numbers. This is why models are bad at counting the letters in a word: they never saw the letters.
+Here is why this is worth a section instead of an apology. **I verified the artifact. I never verified that it was the artifact you asked for.** Those are different checks, and the engine only has the first one. Every one of the five laws is about whether a claim is true: is it evidenced, has it been attacked, was it decided under degraded context. Not one of them asks whether the thing being examined is the thing that was requested.
 
-**Context window.** The total amount of text the model can look at in one call, measured in tokens. When your terminal said "474k tokens," that was the size of the conversation being resent to the model on every single turn. This is why long sessions get expensive fast: you pay for the whole history each time, not just your new message.
+That is a cheap gate and it belongs in E0 or E1: **restate the target and get confirmation before spending research on it.** One sentence, "I am about to analyze X, is that what you meant," would have saved an entire pass. This costs nothing and it is now the only finding in this run that came from the run's own failure rather than from a source.
 
-**Harness.** The program wrapped around the model. The model produces text; the harness decides what that text means and what to do about it. The harness gives the model tools, feeds it files, holds its memory, applies limits, and enforces rules. Claude Code is a harness. This word matters a lot for your project and gets its own section (§6).
-
-**Agent and subagent.** An agent is a model plus a harness running in a loop until a job is done. A subagent is a second, separate one that the first spawns to do a piece of work. The subagent gets a clean context window and reports a result back. This is how you parallelize, and it is where four of your eight complaints live.
-
-**Hook.** A script the harness runs automatically at a specific moment, for example before a tool call or when a subagent finishes. Hooks are the harness enforcing something rather than the model choosing to comply. This distinction is the whole game.
-
-**Fail-open vs fail-closed.** When a check breaks or cannot run, does work continue or stop? Fail-open means continue. Fail-closed means stop. A smoke detector with a dead battery that stays silent is fail-open. One that shrieks when the battery dies is fail-closed. Almost every fix on your list is about moving a check from the first kind to the second.
-
-**Spec gap vs implementation gap.** A spec gap means nobody ever wrote the rule. An implementation gap means the rule exists on paper and nothing makes it happen. Different fixes: write the rule, or enforce the rule.
-
-**Gate.** A check that a piece of work has to pass before the next step is allowed to start. A gate that has never been observed to stop anything is not a gate, it is a comment.
+I have kept the article's capture in the repo. It is demoted from evidence to specimen, and §8 explains why the specimen is still useful.
 
 ---
 
-## 2. What the source actually is
+## 2. Vocabulary, in plain English
 
-**URL:** `https://x.com/RahulKu22532718/status/2073977106447634474`
-**Author:** Rahul Kumar (@RahulKu22532718)
-**Posted:** 2026-07-05
-**Format:** long-form X article, not a video
-**Reach:** 108,800 views, 23 likes, 6 reposts, 56 bookmarks
+You are new to this. These terms run through both the lecture and your pasted text, and nothing in your pasted text defines them.
 
-### It is not a video
+**Token.** Models do not read letters or words. Text is chopped into pieces, usually chunks of words, and each piece is mapped to an ID number. The lecture's example: `internationalization` is not worth storing as one unit, because you would need to see that exact word many times to learn anything from it. Split into `international` and `ization` and you get to reuse everything you already learned about both halves. Modern vocabularies run around 100,000 to 250,000 tokens.
 
-You said "go through this video." It is text. I confirmed this three separate ways rather than assuming:
+**Vocabulary (V).** The fixed list of every token the model knows. Everything the model can ever output is an index into this list.
 
-1. The shortlink `t.co/ABhsTsMsnn` resolves with a 301 to `x.com/i/article/2073973224455733248`. The `/i/article/` path is X's long-form article route.
-2. The post's media list contains exactly one entry, a JPEG cover image at 1975x790. There is no video entity and no duration field.
-3. Rendering the page returns 2,400 words of prose with headings and no player element.
+**Embedding.** Each token ID is looked up in a big matrix and becomes a vector of numbers. Token 5 means "read row 5." That vector is what the network actually computes on, and its values are learned during training.
 
-I am flagging this loudly because if I had written "the video says X" anywhere in this report, that sentence would have been invented. Getting the format of your own source wrong is a small error that produces confident nonsense downstream.
+**Logits.** The raw, unnormalized scores the network produces, one per token in the vocabulary. Higher means "more likely next." They are not probabilities yet.
 
-### Two things wrong with it as a source
+**Softmax.** The function that turns logits into probabilities: exponentiate each one, divide by the sum. Output is always non-negative and always sums to exactly 1.
 
-**It is AI output that nobody proofread.** Four times, the published text contains the AI's own instructions to itself. The clearest one:
+**Autoregressive.** Generate one token, append it to the input, generate the next from the longer input, repeat. Each new token depends on every token before it and none after.
 
-> "Here's a rewritten version with the same meaning, similar length, and a fresh writing style to reduce similarity."
+**Attention.** The only part of the Transformer where different positions in the sequence can influence each other. Everything else processes each position independently.
 
-That phrase, "to reduce similarity," tells you what happened: someone fed an existing article to a model and asked it to reword the article enough to not look copied. The model's preamble was never stripped. The Stage 1 heading also appears twice with two different subtitles, which is the same accident.
+**Context window.** How much text the model can look at in one call. When your terminal showed 474k tokens, that was the whole conversation being resent on every turn.
 
-**The reach numbers do not add up.** 108,800 views against 23 likes is a like rate of about 0.02 percent. Organic posts usually land between 1 and 3 percent. Two orders of magnitude below normal is what paid or algorithmic amplification looks like. Treat the view count as a distribution number, not a quality signal.
+**Harness.** The program wrapped around the model. The model turns text into text; the harness gives it tools, files, memory, limits, and rules, and decides what to do with the output. Claude Code is a harness. The Depth Engine is not, and that is the root of your eight complaints. §9.
 
-**So why use it at all?** Because being a bad source and being wrong are different things. The five stages it lists are real and standard. The article is a fine skeleton and a terrible authority. I used it for structure and re-sourced anything load-bearing. That distinction, structure versus authority, is itself worth internalizing.
+**Hook.** A script the harness runs automatically at a specific moment. Hooks are the harness enforcing something rather than the model choosing to comply.
+
+**Fail-open vs fail-closed.** When a check breaks or cannot run, does work continue or stop? A smoke detector that goes silent on a dead battery is fail-open. One that shrieks is fail-closed.
+
+**Spec gap vs implementation gap.** Nobody wrote the rule, versus the rule exists and nothing enforces it.
 
 ---
 
-## 3. Corrections to your pasted session summary
+## 3. What the source is
 
-This is the most operationally important section. Your pasted text is a summary of a summary, produced on a machine I cannot reach, about files I cannot open. That is the setup where errors survive, because nobody can check them. I checked what I could against primary documentation. Four things are wrong.
+**URL:** `https://x.com/Dhruvkumar16797/status/2092490146793013420/video/1`
+**Posted:** 2026-08-26 by Dhruv kumar (@Dhruvkumar16797)
+**Media:** one video, id 2092486905632055296, **9,291.7 seconds = 2 h 34 m 52 s**, 640x360, no caption track
+**Quotes:** the Rahul Kumar article from my first pass
 
-### X-003: "Claude Code has quota auto-resume." It does not.
+### Which class it is
 
-Your batch 2 wrote this down as a platform feature and then used it to shrink your own scope, concluding "only the stale-agent reaper is engine work."
+The audio never states the speaker's name or the course number, so what follows is inference, clearly labeled as such. The evidence is strong and converges:
 
-What the documentation actually says:
+- The lecturer says **"Chris has talked about a linear model"** and **"Chris is using almost exactly the same notation."** Stanford CS229 has been co-taught by Tengyu Ma and Chris Ré.
+- Discussing why bad local minima are rare in high dimensions, the lecturer says **"in one of my papers, I think we try to compute the number of local minimums by using ... the Kac-Rice formula."**
+- On residual connections improving optimization conditioning: **"including some of my papers."**
+- He refers to "the lecture notes" nine times, and to "next lecture" being backpropagation and auto-differentiation.
 
-- **Fallback model chains** exist. Configure them with `--fallback-model sonnet,haiku` or the `fallbackModel` setting. But the docs are explicit about what does not trigger them: *"Authentication, billing, rate-limit, request-size, and transport errors, and a denial by your organization's policy check, never trigger a switch."* Rate-limit is exactly your case. Fallback chains do not fire when you run out of quota.
-- On hitting a usage limit, a subagent's API request **fails terminally** and the subagent stops before finishing its task. Once the error clears, you have to ask Claude to retry or resume it. Nothing resumes on its own.
+That combination points to **Stanford CS229, lecturer Tengyu Ma**. Treat it as high-confidence inference, not established fact.
 
-**Why this matters.** Your summary says the exact feature whose absence killed two of your runs is now shipped. It is not. If you build on that belief, two of your eight complaints stay open and you will not know why. Quota handling is still your work, and it belongs in the design next to the stale-agent reaper, not crossed off the list.
+**The best thing this gives you is not the video.** The lecture notes he keeps pointing at are public and current: [cs229.stanford.edu/main_notes.pdf](https://cs229.stanford.edu/main_notes.pdf), last updated 2026-08-23, three days before this run. Everything he says "check the notes" about is in there, written by the person who said it, with the equations that audio cannot carry. Read the notes. Use the video for intuition.
 
-Sources: [Model configuration](https://code.claude.com/docs/en/model-config), [Models, usage, and limits in Claude Code](https://support.claude.com/en/articles/14552983-models-usage-and-limits-in-claude-code), [Error reference](https://code.claude.com/docs/en/errors).
+### It is two lectures, not one
 
-### X-004: The subagent hooks exist, but the one you want cannot block.
+The 2h35m video is stitched, and in reverse teaching order:
 
-Your summary says "sub-agent start/stop hooks (the dispatch registry nearly free)." Both events do exist. But your D1 design wants an unrouted launch to be *unrecordable*, which means the gate has to be able to stop the launch. `SubagentStart` cannot.
+| Portion | Content |
+|---|---|
+| First ~48% | The LLM lecture: tokenization and BPE, autoregressive decomposition, embeddings, logits and softmax, generation with temperature and top-k, the NLL loss, then the Transformer: attention, Q/K/V, masking, multi-head, residual and norm, and the T² cost |
+| Last ~52% | The prerequisite lecture: non-linear models, loss functions, cross-entropy, gradient descent and SGD, neural networks, ReLU and other activations, ResNet, LayerNorm and RMSNorm, ConvNets |
 
-From the hooks documentation, exit code 2 behavior per event:
+The second half comes *before* the first half in the course. If you find the opening heavy, start at the halfway point and come back.
 
-| Event | What exit code 2 does |
+---
+
+## 4. Corrections to your pasted session summary
+
+These carried over from v1 and are unaffected by the source change. All were checked against primary documentation, not opinion.
+
+### X-003: "Claude Code has quota auto-resume." It does not. Load-bearing.
+
+Your batch 2 recorded this as shipped and used it to cut scope, concluding "only the stale-agent reaper is engine work."
+
+- **Fallback model chains** exist, via `--fallback-model sonnet,haiku` or the `fallbackModel` setting. The docs are explicit about what does not trigger them: *"Authentication, billing, rate-limit, request-size, and transport errors ... never trigger a switch."* Rate-limit is exactly your case.
+- On hitting a usage limit, a subagent's API request **fails terminally**. Once the error clears you must ask Claude to retry or resume. Nothing resumes by itself.
+
+**Why it matters:** your summary crossed off the feature whose absence killed two of your runs. Quota handling is still your work and belongs next to the reaper on the build list.
+
+### X-004: `SubagentStart` cannot block. Load-bearing.
+
+Your D1 wants an unrouted launch to be *unrecordable*, which requires stopping the launch. From the exit-code-2 table:
+
+| Event | What exit 2 does |
 |---|---|
 | `PreToolUse` | Blocks the tool call |
 | `TaskCreated` | Blocks task creation |
 | `SubagentStop` | Prevents the subagent from stopping |
-| `Stop` | Prevents Claude from stopping |
 | **`SubagentStart`** | **Shows stderr to user only** |
 
-And explicitly:
+And verbatim: *"For `SessionStart`, `Setup`, and `SubagentStart`, the exit code 2 stderr renders ... Claude doesn't see it, and the session or subagent proceeds."*
 
-> "For `SessionStart`, `Setup`, and `SubagentStart`, the exit code 2 stderr renders in the transcript as a `<hook name> hook error` notice... Claude doesn't see it, and the session or subagent proceeds."
+Wire your fail-closed gate to `SubagentStart` and you have built a fail-open gate wearing a fail-closed label. Your own batch 4 already found that wrapper discipline fails open and only a structural route fails closed. The design violated that one paragraph after stating it. **Put the blocking check on `PreToolUse` or `TaskCreated`; use `SubagentStart` only for the registry row, since recording is all it can do.**
 
-**Read that last clause again: the subagent proceeds.** `SubagentStart` is a notification, not a gate. If you wire your fail-closed routing check to it, you have built a fail-open check and called it fail-closed. That is the precise pathology your run exists to eliminate, reproduced inside the fix.
+### X-005: F4's root cause is confirmed, and the fix is better than you knew.
 
-**The correct wiring:** put the blocking check on `PreToolUse` or `TaskCreated`, both of which genuinely block. Use `SubagentStart` for the registry row only, since recording is all it can do.
+The subagent `model` frontmatter field is optional and *"Defaults to `inherit`"*. That is your all-Opus screenshot. The part your summary missed is the resolution order:
 
-This is also a perfect illustration of the "Stop Means Stop" finding your batch 4 already had: telling the agent to stop fails open, and only a route with no bypass fails closed. Your summary had the principle and then violated it one paragraph later.
+1. `CLAUDE_CODE_SUBAGENT_MODEL` environment variable
+2. per-invocation `model` parameter
+3. subagent frontmatter `model`
+4. the main conversation's model
 
-Source: [Hooks reference](https://code.claude.com/docs/en/hooks).
+The environment variable sits on top and overrides everything under it. Nothing the model does routes around an environment variable. That is a structural control, not a rule an agent has to remember, and your own evidence says prose rules decay every time.
 
-### X-005: Your F4 root cause is confirmed, and the fix is stronger than you think.
+### X-006: The version drift you were told to fix is not in this tree.
 
-Confirmed verbatim. The subagent `model` frontmatter field is optional and *"Defaults to `inherit`"*, meaning the subagent uses the same model as the main conversation. That is your all-Opus screenshot, explained.
+`package.json` says `0.1.0`, `CHANGELOG.md` says `[0.1.0] — 2026-07-01`, `HANDOFF.md` says "v0.1.0". All three agree. No 0.2.0 anywhere.
 
-The part your summary missed is the resolution order, which the docs state precisely:
-
-1. The `CLAUDE_CODE_SUBAGENT_MODEL` environment variable
-2. The per-invocation `model` parameter
-3. The subagent definition's `model` frontmatter
-4. The main conversation's model
-
-The environment variable sits at the top and overrides everything below it. That means you have a genuinely structural control, not a rule the agent has to remember. Nothing the model does can route around an environment variable. Compare that to a written instruction saying "always pass the model parameter," which is exactly the kind of prose rule your own evidence says decays under pressure every single time.
-
-Source: [Subagents](https://code.claude.com/docs/en/sub-agents).
-
-### X-006: The version drift you were told to fix does not exist in this copy.
-
-Your summary says: "The engine repo says 0.2.0 in package.json but is only tagged v0.1.0, with a stale handoff doc."
-
-On this Mac, `depth-engine-main`:
-
-- `package.json` → `"version": "0.1.0"`
-- `CHANGELOG.md` → top entry is `## [0.1.0] — 2026-07-01`
-- `HANDOFF.md` → titled "Handoff — Depth Engine v0.1.0"
-
-All three agree. There is no 0.2.0 anywhere and no drift to reconcile. Either the drift is on the other machine, or the claim was wrong.
-
-**There is real drift, just not that one.** `HANDOFF.md` claims "Tests: 26 passing." I ran the suite: **29 passing, 0 failing**, in 385ms on Node 24.16.0. The handoff is stale by three tests, which is the signature of code landing without the docs following. That is a small instance of your F6 complaint.
-
-Note the method here, because it is the point: I did not ask a model whether the version was consistent. I opened three files and ran the test suite. Total cost, a few seconds. §4 explains why that difference is not a style preference.
+Real drift found instead: `HANDOFF.md` claims "Tests: 26 passing." I ran it. **29 passing, 0 failing, 385ms, Node 24.16.0.** Docs stale by three tests, which is your F6 in miniature.
 
 ---
 
-## 4. The important part: why the training pipeline explains your five laws
+## 5. The core section: mechanism for four of your five laws
 
-This is what the article is actually worth to you.
+Your five laws are currently asserted. Nothing explains why a model needs them, so they read as someone's taste in rigor, which makes them the first thing dropped under deadline. They are not taste. Each is a countermeasure to a specific property of how these systems compute. The lecture supplies the property.
 
-The Depth Engine has five always-on laws. Right now they are asserted. Nothing in the engine explains *why* a model needs them, so they read like someone's opinion about rigor. They are not opinions. Each one is a countermeasure to a specific, known consequence of how these models are built. Once you can trace a law back to the training stage that causes the problem, you stop treating the law as bureaucracy and you stop being tempted to skip it under deadline pressure.
+### 5.1 L-D (stop, no infinite regress), and the exact mechanical cause of F1
 
-Here are the five training stages, then the mapping.
+This is the most actionable finding in the report.
 
-### The five stages, briefly
+The lecture builds the model as a chain of conditional probabilities. At every position the network emits a vector of logits with one entry per vocabulary token, and then:
 
-1. **Data.** Collect an enormous amount of text, remove duplicates and junk, then convert it all to tokens.
-2. **Pretraining.** Show the model token sequences and have it guess the next token, trillions of times, adjusting slightly on every miss. That is the entire objective. What comes out is a *base model*: enormously knowledgeable, not an assistant. Ask it a question and it may just continue your sentence.
-3. **Supervised fine-tuning (SFT).** Train on a few thousand carefully written examples of good question-and-answer behavior. The learning mechanism is unchanged, still next-token prediction, but the examples are curated. This is what turns a text-continuation engine into something that answers you.
-4. **Reward modeling.** Have humans rank multiple answers to the same prompt, then train a *second* model whose only job is to predict which answer a human would prefer. You now have an automated stand-in for human judgment that can score millions of responses.
-5. **Reinforcement learning (RLHF).** Let the assistant generate, let the reward model score, adjust the assistant toward higher scores, repeat. Some labs now use principles instead of per-response human ratings, which is Constitutional AI or RLAIF.
+> "you take a softmax, you get a probability vector ... the sum of the entries is one, and all of the entries are non-negative."
 
-### The mapping, which is the actual finding
+Vocabulary size is on the order of 250,000. Generation then samples from that distribution, appends the result, and repeats.
 
-| Law | What it says | The stage that makes it necessary |
+**There is no null entry in that vector.** The distribution is always complete and always normalized. Asking a model "do you have another question?" is sampling from a machine whose output space does not contain "no." It will always produce something, and at any temperature above zero it will sometimes produce something from the tail.
+
+Your E8 gate is "keep looping until the adversarial generation pass produces nothing new." That gate has no false branch. It is not a strict gate that you have failed to satisfy. It is a gate whose *no* wire was never connected. Your run's own history is the evidence: E8 never converged in three passes, and what ended it was a cap you typed by hand.
+
+**The fix, and it is structural rather than a stronger instruction:** enumerate the aspects at E5, close the list, and converge when every item on the closed list is covered. Coverage over a finite set has a false branch, because a set can be exhausted. Demote "I thought of another question" from a gate to a logged signal. This is what your Pocock audit found ("ends when the frontier is empty") and now it has a mechanical reason rather than an analogy.
+
+### 5.2 L-E (evidence over assertion), stated in one sentence
+
+The lecture writes the training objective out explicitly. The negative log likelihood is the sum over positions of
+
+> `- log softmax(f_θ(x_0 … x_{t-1}))[x_t]`
+
+and the lecturer is precise about what `x_t` is: *"this `x_t` is a particular choice of `x_t` ... which is seen in the data."*
+
+So the objective maximizes the probability the model assigns to **the token that actually appeared in the training text**. Not the true token. Not the correct token. The one that was there.
+
+**Truth is not a term in the loss function.** Fluency and hallucination come from the same optimization, which is why a confident, well-formed, false sentence is the system working as designed rather than failing. You cannot prompt this away, so you check claims against artifacts instead. That is the entire justification for L-E and for putting mechanical checks ahead of model opinions.
+
+It also explains your batch 4 result that catch rate for stale evidence is flat across a 15x price range. Checking whether a citation is stale requires going and looking. Sampling from a conditional distribution has no lookup step. A better model predicts better and still does not look. Verifying by opinion is asking the wrong organ.
+
+### 5.3 L-B (three-tier memory) is a cost constraint, not a filing preference
+
+The lecture works out attention's cost. For each of T positions you compute an inner product against all T keys, so the score matrix is T by T:
+
+> "the number of operations is T squared times d_h ... if you have capital T being a million, it's gonna take a million times square operations, which is prohibitive."
+
+Then he connects it directly to the tool you use every day:
+
+> "when you are using ChatGPT or Claude Code, you see the context, and then after some point, they say, let me compact my context. And the reason is that you have to shrink the context, otherwise your computational efficiency is too bad."
+
+Context cost is **quadratic**, not linear. Doubling context roughly quadruples attention work. Your 474k-token session was not merely expensive, it was expensive on a curve. Naive memory is also T², which is what flash attention exists to reduce.
+
+That is the mechanical case for L-B and for `CONTEXT_HYGIENE`. "Never load the whole ledger, retrieve from it" stops being hygiene advice and becomes an engineering constraint. It is also why your ECC audit's observation was so sharp: their memory is retrieved, ranked, and capped at six lines, while the engine's is **storage pretending to be retrieval**.
+
+Note the tension with §5.2, and resolve it correctly. Long context is expensive, but your ACE finding measured that *compressing* accumulated context dropped accuracy from 66.7 to 57.1, below never learning at all, and the Meta-Harness Table 3 result was raw logs 50.0 versus a summary of the same logs 34.9. So the answer is not "summarize the ledger to make it cheap." The answer is **keep the ledger whole on disk and load only the rows you need**. Cheap and lossless at once, because the expensive thing is context length, not disk.
+
+### 5.4 L-C (cold re-verify) rests on causal masking
+
+Attention is masked so that position t cannot see anything after t. The upper triangle of the score matrix is set to minus infinity, which softmax turns into exactly zero:
+
+> "in this autoregressive model, you don't allow the output at time T to depend on anything that is after T ... every token only depends on everything before it."
+
+So every answer is a function of its **prefix**. Change the prefix and you change the function's input. A decision made at 400k tokens was computed over one specific prefix, in one specific order, with whatever degradation that length brings. Re-deriving it in a fresh window is not ceremony, it is evaluating the same question against a genuinely different input. It can come out differently, and when it does, that is information.
+
+### 5.5 L-A: honest gap
+
+L-A says self-verification is corrupt and flattering results deserve more scrutiny. In v1 of this report I traced that to reward modeling and RLHF: models are tuned toward responses humans rate highly, agreeable and confident answers rate highly, so sycophancy is the trained objective showing through.
+
+**This lecture does not cover that.** It stops at pretraining and architecture. Supervised fine-tuning, reward models, and RLHF appear only in the demoted article. So the L-A mapping is still article-grade while the other four are now lecture-grade. I am flagging the difference rather than smoothing it, because presenting all five at the same confidence is exactly the flattening §7 is about.
+
+The practical consequence is unchanged and worth stating anyway: fresh instances of the same model share weights, training data, and the same tuning. Wiping chat history removes conversational contamination, not trained-in belief. Ten blind panels of one family agree with each other confidently. Your history already proved it, since codex caught a fail-open bug every same-family reviewer walked past. You currently have zero cross-family paths. Gemini's free tier is the zero-dollar fix.
+
+---
+
+## 6. Temperature: a control the engine never mentions
+
+The lecture spends real time on this and the engine has no concept of it.
+
+Before the softmax, divide every logit by a number τ. This does not change the ranking, only the sharpness:
+
+> "if you choose a temperature to be zero, it means that your generation will just be always deterministic, every time you take the largest most likely token"
+
+and above one:
+
+> "makes the distribution more softer, so that you focus more on the long tail ... so you have more stochasticity and uncertainty in your generation."
+
+There is also top-k: keep only the k most likely tokens, drop the rest, renormalize.
+
+Three consequences for the engine, none of which appear in any of your 57 spec files:
+
+**One. Different stages want different temperatures, and using one setting everywhere is a category error.** E6's question battery and E8's adversarial generation pass genuinely want diversity, which is higher temperature. E7's deterministic checks, any parser, and any verification pass want reproducibility, which is temperature zero. Right now they all run at whatever the session default is.
+
+**Two, and this is a real bug in the M8 verification design: re-running a check at temperature above zero and getting the same answer is not corroboration.** Two samples from one distribution agreeing tells you the distribution is peaked. It tells you nothing about whether the peak is in the right place. If your blind-panel tier is meant to be independent evidence, the independence has to come from a different lens or a different model, never from resampling.
+
+**Three, it sharpens the Tier 0 rule.** Anything executable should be executed, and executing is deterministic by nature. Anything opined should be labeled with the temperature it was opined at.
+
+---
+
+## 7. What a professor's hedges tell you, and why summaries destroy them
+
+Six times in 2.5 hours, teaching material at the frontier, the lecturer says he does not know:
+
+| Topic | What he actually said |
+|---|---|
+| How attention works | "Nobody really know exactly how it works." |
+| Why these activation functions | "exactly why I use any of this is kind of like a magic." |
+| Why RMSNorm beats LayerNorm | "I think it's mostly empirical." |
+| Why 2-3 layers per residual block | "for reasons we don't fundamentally understand necessarily." |
+| Whether bad local minima exist | "of course, nobody really knows exactly whether they are right." |
+| A rumor about Claude's tokenizer | "I didn't verify it myself, but I read some news about this. Assuming they are true..." |
+
+Take that last one seriously. He mentions a report that Claude's tokenizer became more granular, so the same text costs more tokens. He flags it as unverified **in the middle of a lecture**, and moves on. I have not verified it either and I am not repeating it as fact.
+
+**That is L-E behavior in the wild, by a domain expert, unprompted.** Your engine is trying to institutionalize a discipline that the best practitioners already run manually. That is a good sign about the engine, and it means the law can be justified by pointing at practice instead of by assertion.
+
+Now put the two sources side by side. Same subject. Opposite epistemic register:
+
+- The lecture: the field is substantially empirical, several central design choices are unexplained, and here is exactly which ones.
+- The article: a clean five-stage pipeline, confidently narrated, no uncertainty anywhere, 108,800 views.
+
+**The confident version is the one that traveled.** And notice what happened in between: the article was produced by asking a model to reword an existing article, with the instruction "to reduce similarity" left visibly in the published output four times. Somewhere in that rewrite, every hedge died.
+
+This is the sharpest form of your Meta-Harness Table 3 finding. Summaries do not just lose detail. **They lose epistemic markers first**, because "nobody really knows why this works" is exactly the sentence a fluency-optimized rewrite smooths into "this works because." Raw logs scored 50.0 and a summary of those logs scored 34.9, barely above no logs at all, and this is a large part of why.
+
+For v0.3.0 this is a concrete requirement rather than a mood: **the human brief must carry the uncertainty of the machine record, or it is not a second register, it is a lossy copy.** If the ledger says a claim is unverified, the brief says unverified. A brief that reads as more confident than its ledger has failed, and that is a lint you can write.
+
+---
+
+## 8. Things D1 plans to build that already exist
+
+The cheapest improvement available is not building anything. Your batch 2 already made this correction once. It did not go far enough. Documented subagent frontmatter accepts:
+
+| Field | What it does | Which complaint |
 |---|---|---|
-| **L-E** Evidence over assertion | Label every claim by epistemic status; never let an assertion pass as a finding | **Pretraining.** The training objective is *plausible next token*, not *true next token*. Fluency and hallucination come from the same mechanism. A model producing a confident, well-formed, false sentence is not malfunctioning, it is doing exactly what it was optimized to do. You cannot prompt this away, so you check claims against artifacts instead. |
-| **L-A** Adversarial posture, self-verification is corrupt | Every load-bearing claim gets an overturn attempt from a different model family; flattering results get more scrutiny than negatives | **Reward modeling plus RLHF.** The final training stage optimizes the model toward responses humans *rate highly*. Agreeable, confident, well-structured answers rate highly. Sycophancy is not a personality quirk, it is the trained objective showing through. And a model grading its own work is being scored by the same preference function that produced the work, so it will approve. This is why "ask the model if it is sure" is worthless and why the asymmetry, more scrutiny on good news than bad, is correct rather than paranoid. |
-| **L-B** Three-tier memory, trust the file over recollection | Immutable ledger, mutable state, index; trust files and git log over what you remember | **Context windows and tokenization.** The model has no memory. Everything it "remembers" is text resent on every call, and beyond a certain length, material in the middle gets recalled unreliably. Recollection from a long context is genuinely less trustworthy than reading the file again. This is a measurable property, not a discipline preference. |
-| **L-C** Cold re-verify high-context decisions | Re-check important decisions in a fresh window | Same cause as L-B. A decision made at 400k tokens of context was made under degraded recall. Reproducing it cold is a real test, and one it can fail. |
-| **L-D** Freeze, no infinite self-perfection | Once protocols are sound, stop editing them | **Pretraining, from the other direction.** A strong next-token predictor can always generate one more plausible objection, because generating plausible text is the one thing it is guaranteed to be able to do. "Can I think of another question?" therefore never returns no. Any stop rule built on that question cannot terminate. This is the mechanical cause of your F1, stated in one sentence. |
+| `model` | Pins the model. Defaults to `inherit`. | **F4**, entirely |
+| `maxTurns` | Hard cap on agentic turns | **F1 / F2**, an external stop the agent cannot raise |
+| `effort` | `low` through `max`, per subagent | **F7**, spend control |
+| `isolation: worktree` | Own git worktree | Parallel agents stop colliding |
+| `tools` / `disallowedTools` | Allowlist or denylist | Blast radius |
+| `permissionMode` | Per-subagent permissions | Blast radius |
+| `hooks` | Hooks scoped to one subagent | Per-agent enforcement |
+| `memory` | `user`, `project`, or `local` scope | Ledger plumbing |
 
-### The three consequences you should take from this
+`maxTurns` deserves attention. Your F1 is "no stopping point" and the platform ships a hard turn cap as a one-line field. It will not decide when research is *complete*, which is §5.1's harder problem, but it makes an unbounded loop structurally impossible, which is the part that actually burned you. Your ECC audit praised a 150-line script for implementing turn caps. You do not need the script.
 
-**First, and this is the big one: mechanical checks come before model opinions, and now you know why.** Your batch 4 measured that across models spanning a 15x price range, the catch rate for stale or unsourced evidence is flat and near zero. Your summary recorded that as a surprising empirical result. It is not surprising. Checking whether a citation is stale requires *going and looking*. A model asked to grade a claim from its context is running next-token prediction over that context. There is no lookup step in that operation. A bigger model predicts better and still does not look. Verifying by opinion is asking the wrong organ.
+Then telemetry. `CLAUDE_CODE_ENABLE_TELEMETRY=1` gives you:
 
-This is why the M8 Tier 0 ordering is right, and it is also why it needs to be structural rather than advisory. When I checked the version drift in §3, I opened files and ran the suite. When I checked whether `SubagentStart` blocks, I read the documentation. Both took seconds and both found errors that any amount of model deliberation would have sailed past.
+- `claude_code.api_request` events with `model`, `input_tokens`, `output_tokens`, `cache_read_tokens`, `cache_creation_tokens`, `cost_usd`, `request_id`
+- `claude_code.token.usage` and `claude_code.cost.usage` metrics with `model`, `agent.name`, `skill.name`, `effort`, `speed`
 
-**Second, your blind-panel design has a ceiling that follows from the pipeline.** Fresh instances of the same model share the same weights, the same training data, and the same reward model. Wiping the chat history removes conversational contamination. It does not remove trained-in belief. If the model family is systematically wrong about something, ten blind panels agree with each other, confidently, and you have bought calibration theater. Your own history already proved this: codex once caught a fail-open bug that every same-family reviewer walked past. The Tier 3 cross-family check is not a nice-to-have, it is the only tier that addresses this failure class. You currently have zero paths to it. Gemini's free tier costs nothing and would close it.
+F7 is "token burn with no budget, no tracking, no reporting." Cost and tokens per model per named agent, emitted automatically. F4's second half is "no record says which model a subagent ran on." The `model` attribute is on every event. **Your D1 proposes building a dispatch registry to collect data that is already being emitted.**
 
-**Third, "quality over quantity" is not a slogan here, it is a measured property.** Pretraining uses trillions of tokens. SFT uses thousands, sometimes fewer, and it is SFT that determines behavior. The same asymmetry shows up in your audits: Pocock's 37 skills total about 25,000 words, the engine spends about 102,000 on the same jobs, and his produce a working stop rule while the engine's do not. More words describing rigor is not more rigor. When you write v0.3.0, treat every added word as a cost.
-
----
-
-## 5. Things D1 plans to build that already exist
-
-You asked me to find what makes the engine better. The cheapest improvement available is not building anything. Your batch 2 already corrected batch 1 on this point once, concluding "the platform ships more than credited." That correction did not go far enough. Here is what a subagent definition accepts today, from the documented frontmatter:
-
-| Field | What it does | Which complaint it closes |
-|---|---|---|
-| `model` | Pins the model. **Defaults to `inherit`.** | **F4**, routing, entirely |
-| `maxTurns` | Hard cap on agentic turns before the subagent stops | **F1 / F2**, an external stop rule the agent cannot argue with |
-| `effort` | `low` through `max`, per subagent | **F7**, spend control on cheap mechanical stages |
-| `isolation: worktree` | Runs in its own git worktree | Parallel agents stop clobbering each other's files |
-| `tools` / `disallowedTools` | Allowlist or denylist of tools | Blast radius |
-| `permissionMode` | Permission behavior for that subagent | Blast radius |
-| `hooks` | Lifecycle hooks scoped to just that subagent | Per-agent enforcement |
-| `memory` | Persistent memory scope: `user`, `project`, `local` | Ledger plumbing |
-
-`maxTurns` deserves a second look. Your F1 is "no stopping point," and the platform ships a hard turn cap as a one-line field. It will not decide *when the research is complete*, which is the harder problem, but it does make an unbounded loop structurally impossible, which is the thing that actually burned you. Your ECC audit praised a 150-line script for implementing turn caps. You do not need the script.
-
-Then telemetry. Set one environment variable, `CLAUDE_CODE_ENABLE_TELEMETRY=1`, and you get:
-
-- `claude_code.api_request` events carrying `model`, `input_tokens`, `output_tokens`, `cache_read_tokens`, `cache_creation_tokens`, `cost_usd`, and `request_id`
-- `claude_code.token.usage` and `claude_code.cost.usage` metrics carrying `model`, `agent.name`, `skill.name`, `effort`, and `speed`
-
-Read that list against your complaints. F7 is "token burn with no budget, no tracking, no reporting." Cost and tokens per model per named agent, emitted automatically. F4's second half is "no record anywhere says which model a subagent actually ran on." The `model` attribute is on every event. Two of your eight complaints have their entire measurement layer available behind one environment variable, and your D1 proposes building a dispatch registry to collect data that is already being emitted.
-
-**The rule to take from this:** before designing a mechanism, check whether the harness already has it. Your run has now made this same correction three times, in batch 2, in batch 3, and here. That repetition is itself a finding: "check the platform first" should be a step in the engine's research protocol, not a lesson relearned per batch.
+**The rule:** before designing a mechanism, read the harness documentation. This run has now made that correction three times, in batch 2, in batch 3, and here. A lesson relearned per batch is a missing protocol step, not an insight.
 
 ---
 
-## 6. "Make the depth engine a harness for us," explained plainly
+## 9. "Make the depth engine a harness for us," in plain English
 
-You asked what I meant by this question, so here it is without jargon.
+You asked what the question meant.
 
-Go back to §1. A model turns text into text. A harness is the program around it that gives it tools, files, memory, limits, and rules, and decides what happens next. Claude Code is a harness.
+A model turns text into text. A harness is the program around it that gives it tools, files, memory, limits, and rules and decides what happens next. Claude Code is a harness.
 
-**Right now the Depth Engine is not a harness. It is a set of instructions that a harness reads.** Concretely, it is 12 stage documents, 5 law documents, and 5 protocol documents, plus a small Node CLI whose entire job is to copy those documents into a folder and make a run directory. Nothing in it runs during a session. Nothing in it can stop anything. When a stage document says "this gate cannot be bypassed," the only thing enforcing that sentence is the model choosing to comply with a sentence.
+**The Depth Engine is not one. It is documents that a harness reads.** Twelve stage files, five law files, five protocol files, and a small Node CLI whose entire job is to copy those documents into a folder and make a run directory. Nothing in it runs during a session. Nothing in it can stop anything. When a stage file says "this gate cannot be bypassed," the only thing enforcing that sentence is a model choosing to comply with a sentence.
 
-That is the root of all eight complaints. Not one of them is a thinking failure. Your specs think well. They think in a medium that cannot enforce.
+That is the root of all eight complaints. None of them is a thinking failure. Your specs think well. They think in a medium that cannot enforce.
 
-The three options I offered were:
+The three readings I offered:
 
-**(a) Keep it as a methodology.** Better documents, same medium. Cheapest, and your own evidence says it fails: "rules written as words decayed under pressure every time, while rules that run as code held every time."
+**(a) Keep it a methodology.** Better documents, same medium. Cheapest, and your own evidence says it fails: rules written as words decayed under pressure every time, rules that ran as code held every time.
 
-**(b) Turn it into a real harness.** The engine ships code that runs: hooks that block, scripts that check, caps that bind, a registry that records. The documents stay, but every load-bearing rule gets an executable counterpart. Bigger job.
+**(b) Make it a real harness.** It ships code that runs: hooks that block, scripts that check, caps that bind, a registry that records. Documents stay; every load-bearing rule gets an executable counterpart.
 
-**(c) Staged.** Build the enforcement layer for the research engine first, which is your D1. Then notice that the same layer is what you need for everyday work and generalize it.
+**(c) Staged.** Build the enforcement layer for the research engine first, then generalize it.
 
-**My recommendation is (c), and the reason is that (b) and (c) are the same build.** A stop rule, a dispatch registry, a budget ledger, a diff surface, and a docs prompter are not research-engine features. They are harness features. Build them once for the research engine because that is where you have 160 pinned failures proving they are needed, and you have also built the everyday harness. The "harness for us" outcome is not a second project after v0.3.0. It is what v0.3.0 becomes if you build the enforcement layer as real code rather than a longer specification.
+**I recommend (c), because (b) and (c) are the same build.** A stop rule, a dispatch registry, a budget ledger, a diff surface, and a docs prompter are not research-engine features, they are harness features. Build them once for the research engine, where you have roughly 160 pinned failures proving they are needed, and you have built the everyday harness. "A harness for us" is not a project after v0.3.0. It is what v0.3.0 becomes if you build enforcement as code instead of as a longer specification.
 
-I have written this report on that assumption. If you meant something different, say so and I will redo §7.
-
----
-
-## 7. What to build, in order
-
-Ranked by verified evidence divided by effort. Each item names the check that makes it fail-closed, because an item without one is a wish.
-
-### Tier 1: do these this week, hours not days
-
-**1. Pin the model on every subagent, and lint for it.**
-Add `model:` to every subagent definition. Add a CI check that fails the build if any definition omits it. Optionally set `CLAUDE_CODE_SUBAGENT_MODEL` as a hard override at the top of the resolution order.
-*Fail-closed check:* the CI lint. A missing field fails the build.
-*Closes:* F4. *Effort:* under an hour. *Removable when:* never, it is the enforcement.
-
-**2. Turn on telemetry.**
-`export CLAUDE_CODE_ENABLE_TELEMETRY=1`, point the exporter somewhere, and read `claude_code.api_request` and `claude_code.token.usage`.
-*Fail-closed check:* none yet, this is measurement. It is the prerequisite for the budget gate in Tier 2.
-*Closes:* the measurement half of F7 and F4. *Effort:* minutes. *Removable when:* never.
-
-**3. Put `maxTurns` on every subagent.**
-Pick a number per agent type. Reading agents get small numbers.
-*Fail-closed check:* the platform enforces it. The agent cannot raise its own cap.
-*Closes:* the runaway half of F1 and F2. *Effort:* minutes. *Removable when:* an evidence-sufficiency stop rule is live and proven.
-
-**4. Fix the git gap.** Partly done today, see §9. The engine's own source was not under version control.
-*Fail-closed check:* a pre-push hook that refuses to push with a failing test suite.
-*Closes:* F5. *Effort:* done for the repo connection, an hour for the hook.
-
-### Tier 2: the real design work, days
-
-**5. Build the stop rule as a coverage check over a closed list.**
-This is the single highest-value item and your Pocock audit already named the fix. Today E8 asks "can I think of another question?" Per §4, a next-token predictor can always produce one, so that loop has no reachable exit. Replace it with: enumerate the aspects at E5, close the list, and converge when every aspect is covered. Keep "I thought of another question" as a logged signal, not a gate that blocks completion.
-*Fail-closed check:* the phase walk refuses to load if the state machine has no reachable final state. Your batch 1 already found a library that does exactly this.
-*Closes:* F1 structurally. *Effort:* a few days, mostly reworking E8.
-
-**6. Build the stale-agent reaper AND quota handling.**
-Both, because §3 shows auto-resume does not exist. A subagent that dies on a usage limit stays dead until a human asks for a retry. Registry row written before launch with a deadline, a sweeper that finds rows past deadline with no end time, a state where ABANDONED cannot silently become DONE, and a resume path for quota deaths specifically.
-*Fail-closed check:* `PreToolUse` or `TaskCreated` blocks a dispatch with no registry row. **Not `SubagentStart`**, which cannot block. Use `SubagentStart` for the row write and `SubagentStop` for the close-out.
-*Closes:* F3, plus the two runs that died on quota. *Effort:* a few days.
-
-**7. Budget ledger with an operator-owned cap.**
-Sits on top of item 2. The agent reads the budget and cannot raise it.
-*Fail-closed check:* a hook that blocks new dispatches past the cap.
-*Closes:* F7. *Effort:* one to two days once telemetry is flowing.
-
-### Tier 3: quality, ongoing
-
-**8. Two-register output.**
-Every deliverable emits a machine record and a human brief, where the brief answers a different question rather than compressing the record. This report is an attempt at the human register. Note what it does *not* do: it does not summarize the ledger, it argues a case and points at the ledger for detail. Your Meta-Harness Table 3 finding is the reason for the split. Raw logs scored 50.0, an LLM summary of the same logs scored 34.9, and scores alone scored 34.6. A summary recovered almost none of the signal. So do not compress the record, write a second document with a different job.
-*Fail-closed check:* a linter on the human register. Your smb voice linter is the one rule system in your history that never decayed. Generalize that one.
-*Closes:* F8. *Effort:* the linter is a day, the discipline is permanent.
-
-**9. Get one cross-family path.**
-Per §4, blind panels of the same family share trained-in blind spots. Gemini's free tier costs zero. Until you have one, label same-family verdicts as same-family so nobody mistakes them for independent.
-*Effort:* an afternoon.
-
-### Two things to stop doing
-
-**Stop the crawl at a fixed number of batches.** Your summary says the queue is exhausted as a ranking tool, the dryness test has been broken since batch 3 because of the GitHub code-search bug, and the material is still improving. That combination has no self-terminating condition, and §4 explains why the agent will never produce one on its own. This is F2 happening inside the run built to fix F2. Pick N, and pick it yourself.
-
-**Stop treating "the platform doesn't have it" as established.** Three times now the crawl has concluded something was missing and later corrected itself. Make "check the harness documentation first" a required step before any mechanism is designed.
+This report assumes (c). It is my inference, not your confirmation. If you meant (b), §11's ordering does not change, only this section's framing.
 
 ---
 
-## 8. How to get deeper into AI, concretely
-
-You said you want to get deeper into AI knowledge to leverage the engine. Ordered by how much it will change your work.
-
-**Highest value: read the harness documentation properly.** You are building a system on top of Claude Code and this report found four errors in your own summary of what it does. Read [hooks](https://code.claude.com/docs/en/hooks), [subagents](https://code.claude.com/docs/en/sub-agents), [model configuration](https://code.claude.com/docs/en/model-config), and [monitoring](https://code.claude.com/docs/en/monitoring-usage) end to end, once, on purpose. Two hours. It will save you weeks of building things that already exist and hours of debugging gates that cannot block.
-
-**Second: get hands-on with tokenization.** Paste text into a tokenizer and watch it split. It takes ten minutes and it makes context windows, pricing, and the letter-counting failure stop being trivia and start being mechanics you can reason about.
-
-**Third: build a tiny language model.** Karpathy's nanoGPT or a similar minimal implementation, trained on a small text file on your laptop. You will watch loss go down while it predicts the next token and nothing else, and pretraining will stop being a word. This is the article's own advice and it is correct. Half a day.
-
-**Fourth: read one real paper properly rather than ten summaries.** Your own run demonstrates why. The "6x" figure in your summary turned out to be the Meta-Harness paper citing someone else's work, and it took reading the paper to catch that. Pick the paper closest to your problem, probably Stop Means Stop given F1, and read it.
-
-**Fifth: learn the evaluation vocabulary.** Reward model, preference data, RLHF, RLAIF, Constitutional AI, LLM-as-judge, calibration. You are designing a verification system built on LLM judges. Knowing what a reward model is and what it is not, per §4, is the difference between designing Tier 2 calibration on purpose and hoping the panel is good.
-
-**What to skip for now.** Transformer architecture internals, attention math, and training infrastructure. Interesting, and not on the path to a better harness. Come back to them when you have a reason.
-
----
-
-## 9. What I saved, and the answer to your GitHub question
+## 10. What I saved, and the answer to your GitHub question
 
 You asked: *"depth engine will track its own work too no? Or not?"*
 
-**Today, no.** Here is the evidence, which is more pointed than the answer.
+**Today, no.** The evidence is sharper than the answer.
 
-A private repo `rodriguezzfabricio/depth-engine` already existed, created 2026-07-01. I did not create a second one. Your local `Desktop/depth-engine-main` was **not a git repository at all**: no `.git`, no history, no remote. I connected it to the existing repo and compared.
-
-The local copy had work that existed nowhere else:
+A private repo `rodriguezzfabricio/depth-engine` already existed, created 2026-07-01. I did not create a second one. Your local `Desktop/depth-engine-main` was **not a git repository at all**: no `.git`, no history, no remote. I connected it and compared against `origin/main`:
 
 ```
  M src/cli.js          (+44 / -22)
@@ -340,63 +333,164 @@ The local copy had work that existed nowhere else:
 ?? test/start.test.js  (75 lines, untracked)
 ```
 
-That is the `depth-engine start` command, the feature that creates isolated per-run directories with their own memory. **The command I used to start this very run had never been committed anywhere.** It sat on one laptop's disk, unversioned, with no copy, for a day. If that disk had failed, the feature was gone.
+That is the `depth-engine start` command, the feature that creates isolated per-run directories. **The command I used to start this run had never been committed anywhere.** It sat on one laptop's disk, unversioned, with no copy, for a day.
 
-That is your F5 complaint, "I don't see the changes that you made," in its most literal form. Not only could you not see the changes, neither could git, because there was no git.
+That is F5 in its most literal form. Not only could you not see the changes, neither could git, because there was no git.
 
-I committed it as found, unmodified, and pushed:
+Committed as found, unmodified, after a green suite:
 
 - `f3bbe44` feat: add `depth-engine start` for isolated per-run scaffolding
-- Test suite verified before commit: **29 passing, 0 failing**, 385ms, Node 24.16.0
-- Note recorded: `HANDOFF.md` still says "26 tests" and is now stale by three
+- Verified before commit: 29 passing, 0 failing, Node 24.16.0
+- Noted: `HANDOFF.md` still says 26 tests
 
-**What "the engine tracking its own work" would actually require**, since the answer is currently no:
+**What "tracking its own work" would actually require:**
 
-1. The engine writes `LEDGER.md`, `STATE.md`, `INDEX.md`, and `REGISTER.md` to disk on every run. Nothing commits them, nothing reads them back automatically, and nothing checks them. They are files that happen to exist.
-2. L-B specifies an integrity check on resume: ledger and index counts must match, the register must balance, and `git diff --diff-filter=DR` on the memory directory must show additive-only changes. **That last check requires git.** With no repository, L-B's own integrity invariant could not run. The law was unrunnable, not violated.
-3. Making it real: commit run memory after each stage, run the four L-B invariants as a script in CI, and block on failure.
+1. The engine writes `LEDGER.md`, `STATE.md`, `INDEX.md`, and `REGISTER.md` on every run. Nothing commits them, reads them back, or checks them. They are files that happen to exist.
+2. L-B specifies an integrity check on resume: ledger and index counts must match, the register must balance, and `git diff --diff-filter=DR` on the memory directory must prove changes are additive only. **That check requires git.** With no repository, L-B's own invariant could not run. The law was unrunnable, not violated.
+3. Making it real: commit run memory after each stage, run the four L-B invariants as a script in CI, block on failure.
 
 That is a small, concrete v0.3.0 item that turns an existing law from prose into a passing test.
 
-**Also pushed:** this report and the run's full evidence, under `research/2026-08-26-harness-upgrade/`. That path is outside the `files` allowlist in `package.json`, so it is tracked in git and will not ship in the npm package.
+**One warning before you write that script, found the hard way during this run.** L-B invariant (i) says the number of index rows must equal the highest ledger ID. The obvious implementation is:
+
+```bash
+grep -c '^L-0' memory/LEDGER.md
+```
+
+I ran exactly that. It reported 27 entries against 26 index rows, and the invariant appeared to fail. It had not failed. One ledger entry's body text wrapped so that a continuation line began with the characters `L-0024`, and the count picked it up as a 27th entry. Twenty-six entries, twenty-six rows, invariant holds.
+
+This is a line-anchored regex run over a file that contains prose about its own IDs. It is the same class of defect as your batch 4 discovery that GitHub code search silently under-returns multi-term OR queries: the instrument lied, and every conclusion drawn from it was void until someone checked the instrument itself.
+
+Two things follow.
+
+**Parse the record, not the line.** An entry is an ID line followed by a `Date:` line followed by a `Type:` line. Matching that shape is correct where matching a line prefix is not:
+
+```bash
+awk '/^L-0[0-9]{3}$/{id=$0; getline; if ($0 ~ /^Date: /) {getline; if ($0 ~ /^Type: /) print id}}' memory/LEDGER.md | sort -u | wc -l
+```
+
+**Notice which way the failure went.** This instrument failed loud, a false alarm, which is the safe direction. The dangerous variant is an entry whose ID line is missed: that under-counts and lets a real gap pass silently. Both are fixed by parsing the record. And a check that cries wolf gets switched off around the third false alarm, and a switched-off check is a fail-open check. A wrong integrity check is worse than none, because it also spends your trust.
+
+**Also pushed**, under `research/2026-08-26-harness-upgrade/`, outside the `files` allowlist in `package.json` so it is tracked in git but never ships in the npm package:
 
 ```
 research/2026-08-26-harness-upgrade/
-├── REPORT.md               this document
-├── seed.md                 your request, verbatim, unedited
-├── source_T11_x_article.md the X article, full text, with the format correction
-└── memory/                 LEDGER, INDEX, STATE, REGISTER for this run
+├── REPORT.md                              this document
+├── seed.md                                your request, verbatim
+├── source_T12_stanford_lecture_transcript.txt   23,459 words, the real source
+├── source_T11_x_article.md                the quoted article, demoted to specimen
+└── memory/                                LEDGER, INDEX, STATE, REGISTER
 ```
 
 ---
 
-## 10. Honest ceiling
+## 11. What to build, in order
 
-What this report does not establish, stated plainly so you do not over-trust it.
+Ranked by verified evidence over effort. Each names the check that makes it fail-closed, because an item without one is a wish.
 
-**I could not read the prior session's actual work.** Everything in your pasted text points at `/root/depth-engine-improve/`, which is a Linux path on another machine. I cannot open the D1 draft, the ~160 evidence items, the crawl batches, or the breaker verdicts. Every claim in §3 that I did not independently verify is still a summary of a summary. The four errors I found were the ones checkable from here. There is no reason to think they are the only four.
+### Tier 1: this week, hours not days
 
-There is an irony worth naming: your Meta-Harness finding is that summaries do not recover the missing signal, raw logs scored 50.0 and a summary of those logs scored 34.9. This report is built on a summary of those logs. It is subject to the effect it describes. The fix is to run this analysis where the files are.
+**1. Pin the model on every subagent, and lint for it.** Add `model:` to every definition. CI fails the build if any omits it. Optionally set `CLAUDE_CODE_SUBAGENT_MODEL` as a hard override.
+*Fail-closed check:* the CI lint. *Closes:* F4. *Effort:* under an hour.
 
-**The verification here is single-family.** I am a Claude model checking claims about Claude Code. §4 explains why that is a real limitation. The parts I trust most are not the reasoning, they are the mechanical results: the test suite ran and printed 29, the version strings were read from three files, the redirect returned a 301 to an article URL, and the documentation quotes are quoted. Those are Tier 0. The synthesis in §4 and the rankings in §7 are Tier 1 at best and have had no adversarial pass.
+**2. Turn on telemetry.** `CLAUDE_CODE_ENABLE_TELEMETRY=1`, point the exporter somewhere.
+*Fail-closed check:* none, this is measurement, and it is the prerequisite for item 7. *Closes:* the measurement half of F7 and F4. *Effort:* minutes.
 
-**The five-stage mapping in §4 is my argument, not a citation.** The training stages are standard and well sourced. The claim that each stage causes a specific one of your five laws is analysis I constructed. I believe it is right and it is the most useful thing here, but no external source states it and nobody has attacked it. Treat it as a strong hypothesis that earns its place by being useful, not as an established result.
+**3. Put `maxTurns` on every subagent.** Reading agents get small numbers.
+*Fail-closed check:* the platform enforces it; the agent cannot raise its own cap. *Closes:* the runaway half of F1 and F2. *Effort:* minutes.
 
-**Nothing about the engine's behavior was changed.** No stage file, law file, or protocol was edited. The only code change was committing work that already existed.
+**4. Set temperature per stage.** Temperature 0 for E7 verification, all parsers, and every mechanical check. Higher for E6 generation and E8 adversarial passes. Record the temperature next to every opinion-tier verdict.
+*Fail-closed check:* a lint that rejects a verification record with no temperature field, and rejects any verification recorded above 0. *Closes:* the reproducibility hole in M8. *Effort:* an hour. **New in v2, from §6.**
+
+**5. Add a target-confirmation gate to E0/E1.** Restate the artifact you are about to analyze and get a yes before spending a research pass on it.
+*Fail-closed check:* E1 cannot produce `intent_brief.md` without a confirmed target line. *Closes:* the failure this run committed. *Effort:* minutes. **New in v2, from §1.**
+
+### Tier 2: real design work, days
+
+**6. Rebuild the stop rule as coverage over a closed list.** Highest-value item. §5.1 gives the mechanical reason the current gate cannot terminate: the softmax has no null entry, so "any more questions?" has no false branch. Enumerate aspects at E5, close the list, converge when covered. Demote "I thought of another question" to a logged signal.
+*Fail-closed check:* the phase walk refuses to load a state machine with no reachable final state. Your batch 1 found a library that does exactly this. *Closes:* F1 structurally. *Effort:* a few days.
+
+**7. Stale-agent reaper AND quota handling.** Both, because §4 shows auto-resume does not exist. Registry row written before launch with a deadline, a sweeper for rows past deadline with no end time, a state where ABANDONED cannot become DONE, and a resume path specifically for quota deaths.
+*Fail-closed check:* `PreToolUse` or `TaskCreated` blocks a dispatch with no registry row. **Not `SubagentStart`.** *Closes:* F3 and the two runs that died on quota. *Effort:* a few days.
+
+**8. Budget ledger with an operator-owned cap.** Sits on item 2. The agent reads the budget and cannot raise it.
+*Fail-closed check:* a hook blocks new dispatches past the cap. *Closes:* F7. *Effort:* one to two days.
+
+**9. Make the ledger queryable, never compressed.** §5.3 resolves the apparent conflict: context is quadratic so length is the cost, but compression measurably destroys signal. Keep the ledger whole on disk, load rows on demand, never summarize it into context.
+*Fail-closed check:* a hook that blocks reading the ledger file whole. *Effort:* one day.
+
+### Tier 3: quality, ongoing
+
+**10. Two-register output with an uncertainty check.** Machine record plus human brief, where the brief answers a different question rather than compressing the record. §7 adds the requirement that makes it real: **the brief must carry the machine record's uncertainty.** A brief more confident than its ledger has failed.
+*Fail-closed check:* a linter that flags any brief claim whose ledger row is marked unverified but whose brief sentence has no hedge. Your smb voice linter is the one rule system in your history that never decayed. Generalize that one. *Closes:* F8. *Effort:* a day for the linter.
+
+**11. Get one cross-family path.** §5.5. Gemini's free tier costs nothing. Until then, label same-family verdicts as same-family.
+*Effort:* an afternoon.
+
+### Two things to stop
+
+**Cap the crawl at a fixed N.** Your summary says the queue is exhausted as a ranking tool, the dryness test has been broken since batch 3 from the GitHub code-search bug, and material is still improving. That has no self-terminating condition, and §5.1 explains why the agent will never produce one. This is F2 happening inside the run built to fix F2. Pick N yourself.
+
+**Stop treating "the platform doesn't have it" as established.** Three self-corrections so far. Make reading the harness docs a required step before any mechanism is designed.
+
+---
+
+## 12. How to get deeper into AI, concretely
+
+Ordered by effect on your actual work.
+
+**1. Read the CS229 notes.** [cs229.stanford.edu/main_notes.pdf](https://cs229.stanford.edu/main_notes.pdf), updated 2026-08-23. This is the single best artifact from this whole exercise. The lecturer says "check the lecture notes" nine times, and audio cannot carry equations or slides. Read the notes; use the video for intuition.
+
+**2. Read the harness documentation properly.** You are building on Claude Code and this report found four errors in your own summary of what it does. [hooks](https://code.claude.com/docs/en/hooks), [subagents](https://code.claude.com/docs/en/sub-agents), [model configuration](https://code.claude.com/docs/en/model-config), [monitoring](https://code.claude.com/docs/en/monitoring-usage), end to end, once, on purpose. Two hours. It will save weeks of building what already exists.
+
+**3. Play with a tokenizer.** Ten minutes. Paste text in, watch it split. Context windows, pricing, and the letter-counting failure stop being trivia and become mechanics.
+
+**4. Implement attention on paper first, then in code.** The lecture gives you the whole thing: multiply input by three matrices to get queries, keys, values; take the inner product of every query with every key; add minus infinity above the diagonal; softmax each row; multiply by values. Do it by hand on a length-4 sequence, then in NumPy. When you can explain why the T-by-T matrix makes cost quadratic, §5.3 stops being a quote and becomes yours.
+
+**5. Train a tiny language model.** nanoGPT or similar, on a small text file, on your laptop. Watch loss fall while it does nothing but predict the next token. Half a day, and §5.2 becomes something you have seen.
+
+**6. Read one primary paper properly instead of ten summaries.** Your own run proves the point: the "6x" figure turned out to be the Meta-Harness paper citing someone else's work, and only reading the paper caught it. Start with Stop Means Stop, since it targets F1.
+
+**What to skip for now.** Reward modeling and RLHF internals beyond the vocabulary, and training infrastructure. Real, and not on the path to a better harness.
+
+---
+
+## 13. Honest ceiling
+
+**The transcript is a lossy instrument, and I recorded its limits before reading the output so I could not rationalize them afterward.**
+
+- `small.en` is a small model. Technical terms and names come through mangled. The transcript contains "cloud code" for Claude Code, "new artworks" for neural networks, "value" for ReLU, "winning descent" for gradient descent, "chat TVT" for ChatGPT, "Cass-Rez" for Kac-Rice, "QN 3.5" for what is probably Qwen. I normalized against primary sources and quoted the transcript only where the meaning is unambiguous in context. I have not quoted a technical term straight from it as if verified.
+- **Audio only.** Every slide, equation, and code sample is gone. This lecture is full of board work, and the lecturer says "check the lecture notes" nine times precisely for the parts that are visual. Everything in §5 and §6 is what was **said**. Any claim about what was *shown* would be invented, and there are none.
+- No timestamps, no speaker diarization. Student questions appear as unattributed text.
+- The lecturer's identity is inference from three converging signals (§3), not a stated fact.
+
+**The pasted session summary remains a summary of a summary.** Everything in your text points at `/root/depth-engine-improve/`, a Linux path on another machine. I cannot open the D1 draft, the roughly 160 evidence items, the crawl batches, or the breaker verdicts. The four corrections in §4 are the ones checkable from here, and there is no basis for thinking they are the only four. This report is subject to the effect it describes in §7. The fix is to run this where the files are.
+
+**Verification is single-family.** I am a Claude model checking claims about Claude Code and reading a lecture about how models like me work. §5.5 explains why that is a real limitation and why fresh instances do not fix it. The engine's L-A cross-family check **could not be run** on this machine: codex is logged out, there is no Gemini CLI, and there are no API keys. Recorded as unsatisfied, never as passed.
+
+**What I trust and what I do not.** The mechanical results are solid: the test suite printed 29, the version strings came from three files, the video is 9,291.7 seconds, the transcription ran on your hardware, and the documentation is quoted rather than paraphrased. The mapping in §5 is my argument built on the lecture's mechanics. The lecture states the mechanics; it says nothing about depth engines. Four of the five mappings rest on lecture evidence and one (§5.5) rests on the demoted article. None has had an adversarial pass. Treat §5 as a strong hypothesis that earns its place by being useful and by being checkable, not as an established result.
+
+**Nothing about the engine's behavior was changed.** No stage, law, or protocol file was edited. The only code change was committing work that already existed.
 
 ---
 
 ## Appendix: correction ledger
 
-| ID | Claim as received | Verified status |
+| ID | Claim | Verified status |
 |---|---|---|
-| X-001 | The link is a video | **False.** Long-form X article. 301 to `/i/article/`, one JPEG, no player |
-| X-002 | The article is a usable source | **Low provenance.** Four leftover AI prompt instructions in the published text; duplicated heading; 0.02% like rate |
-| X-003 | Claude Code has quota auto-resume | **False.** Rate-limit errors never trigger fallback chains; subagents fail terminally and need a manual retry |
-| X-004 | Subagent hooks make the dispatch registry nearly free | **Half true.** Both events exist; `SubagentStart` cannot block, so the gate must sit on `PreToolUse` or `TaskCreated` |
-| X-005 | Subagents inherit the session model when unrouted | **True.** `model` defaults to `inherit`. Also found: `CLAUDE_CODE_SUBAGENT_MODEL` overrides everything |
-| X-006 | package.json says 0.2.0, tagged v0.1.0 | **False here.** All three files say 0.1.0. Real drift found: HANDOFF says 26 tests, actual is 29 |
-| X-007 | OpenTelemetry reports model per dispatch | **True and larger than credited.** Model, tokens, cost, and `agent.name` on every request event |
-| X-008 | A GitHub repo needed creating | **False.** One existed since 2026-07-01. The local copy was not a git repo and held 141 unversioned lines |
+| X-001 | The supplied link is a video | **True of the second URL, false of the first.** The first was a long-form article. |
+| X-002 | That article is a usable source | **Low provenance.** Four leftover AI authoring instructions in the published text, a duplicated heading, and a 0.02% like rate on 108.8K views. Demoted to specimen. |
+| X-003 | Claude Code has quota auto-resume | **False.** Rate-limit errors never trigger fallback chains; subagents fail terminally and need a manual retry. |
+| X-004 | Subagent hooks make the registry nearly free | **Half true.** Both events exist; `SubagentStart` cannot block, so the gate must sit on `PreToolUse` or `TaskCreated`. |
+| X-005 | Subagents inherit the session model | **True.** `model` defaults to `inherit`; `CLAUDE_CODE_SUBAGENT_MODEL` overrides everything. |
+| X-006 | package.json says 0.2.0, tagged v0.1.0 | **False here.** All three files say 0.1.0. Real drift: HANDOFF says 26 tests, actual is 29. |
+| X-007 | OpenTelemetry reports model per dispatch | **True and larger than credited.** Model, tokens, cost, and `agent.name` on every request event. |
+| X-008 | A GitHub repo needed creating | **False.** One existed since 2026-07-01. The local copy was not a git repo and held 141 unversioned lines. |
+| X-009 | The article was the source | **False, and this run's own error.** It is the post *quoted by* the real source. Verifying an artifact is not verifying it is the requested artifact. |
+| X-010 | All five law mappings rest on equal evidence | **False.** Four are lecture-grade; L-A (§5.5) is article-grade because the lecture never reaches RLHF. Flagged rather than smoothed. |
+| X-011 | "A model can always emit one more objection" | **Upgraded from analogy to mechanism.** The softmax is always a normalized distribution over all ~250,000 tokens with no null entry, so the gate has no false branch. |
+| X-012 | The video is one lecture | **False.** Two, stitched in reverse course order: LLMs first, then the prerequisite neural-nets lecture. |
 
-**Sources.** [Subagents](https://code.claude.com/docs/en/sub-agents) · [Hooks](https://code.claude.com/docs/en/hooks) · [Model configuration](https://code.claude.com/docs/en/model-config) · [Monitoring usage](https://code.claude.com/docs/en/monitoring-usage) · [Error reference](https://code.claude.com/docs/en/errors) · [Models, usage, and limits in Claude Code](https://support.claude.com/en/articles/14552983-models-usage-and-limits-in-claude-code) · [How usage and length limits work](https://support.claude.com/en/articles/11647753-how-do-usage-and-length-limits-work) · [The X article](https://x.com/RahulKu22532718/status/2073977106447634474)
+**Sources.**
+Primary: the video transcript (`source_T12_stanford_lecture_transcript.txt`, this repo) · [CS229 lecture notes](https://cs229.stanford.edu/main_notes.pdf) · [Subagents](https://code.claude.com/docs/en/sub-agents) · [Hooks](https://code.claude.com/docs/en/hooks) · [Model configuration](https://code.claude.com/docs/en/model-config) · [Monitoring usage](https://code.claude.com/docs/en/monitoring-usage) · [Error reference](https://code.claude.com/docs/en/errors) · [Models, usage, and limits in Claude Code](https://support.claude.com/en/articles/14552983-models-usage-and-limits-in-claude-code)
+Demoted: [the X article](https://x.com/RahulKu22532718/status/2073977106447634474)

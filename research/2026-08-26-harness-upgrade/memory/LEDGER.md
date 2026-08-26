@@ -280,3 +280,271 @@ Honest ceiling, stated in the deliverable's section 10 and repeated here:
    run's argument, unattacked and uncited. Strong hypothesis, not result.
  - Zero engine stage/law/protocol files were modified.
 Operator review required before any of section 7 is acted on.
+
+L-0016
+Date: 2026-08-26
+Type: correction
+X-009. CORRECTS X-001 AND THE RUN'S OWN E1 INPUT. The operator states the
+video is the right source and the article is not. Both are true and the run
+had the relationship backwards.
+The real target is
+  https://x.com/Dhruvkumar16797/status/2092490146793013420/video/1
+posted 2026-08-26 by Dhruv kumar (@Dhruvkumar16797). That post QUOTES the
+Rahul Kumar article captured at T11. So the article the run read in full was
+the quoted post embedded inside the real source, not the source.
+Root cause of the mistake: at E1 the operator supplied the URL of the quoted
+article rather than the quoting post. The run verified the FORMAT of the URL
+it was given (correctly: that URL is an article) and never asked whether it
+was the right URL. Verifying an artifact is not the same as verifying it is
+the artifact you were asked for. X-001 remains factually true and was
+answering the wrong question.
+Video facts from the post payload:
+  media id 2092486905632055296, duration 9291.733 s = 2 h 34 m 52 s,
+  640x360 max, mp4 variants at 256 kbps and 832 kbps, no caption track.
+Post text describes a Stanford class covering BPE tokenization, the
+Transformer and attention, the training pipeline, NLL loss, and the
+next-token decoder.
+ACTION: the article's five-stage framing (T11) is DEMOTED to supporting
+context. Section 4 of the report was built on the correct subject matter but
+the wrong evidence tier. The video is a primary lecture; the article is a
+paraphrase of a paraphrase.
+
+L-0017
+Date: 2026-08-26
+Type: action
+No caption track ships with the video, so the content is being obtained by
+local transcription rather than by inference from the post text. Writing a
+report about a lecture from its promotional caption would be exactly the
+fabrication L-0005 refused to commit.
+Pipeline, all local, nothing sent to a third party:
+  ffmpeg (~/homebrew/bin/ffmpeg) streams the 480x270 / 256 kbps mp4 variant
+  and writes audio only -> 16 kHz mono s16 WAV, 284 MB, in the session
+  scratchpad. Video frames are discarded; only the audio is kept.
+  whisper-cli (~/homebrew/bin/whisper-cli, whisper.cpp) with the operator's
+  own ggml-small.en.bin (487 MB, ~/Desktop/.whisper-models/) transcribes it.
+Known ceiling of this instrument, recorded BEFORE reading the output so it
+cannot be rationalised afterwards:
+  - small.en is a small model. Technical vocabulary and proper nouns will be
+    mangled. Expect BPE, softmax, logits, and researcher names to come
+    through wrong. Normalise against primary sources, never quote a term
+    straight from the transcript as if it were verified.
+  - Audio-only. Every slide, equation, and code sample on screen is lost.
+    A lecture of this type carries much of its content visually. Any claim
+    about what was SHOWN would be invented; only what was SAID is evidence.
+  - No speaker diarisation and no timestamps in the txt output.
+Verdict tier under M8: this is Tier 0 (mechanical capture), but a lossy
+instrument. The transcript is evidence of what was said, at small.en
+fidelity, and nothing more.
+
+L-0018
+Date: 2026-08-26
+Type: finding
+T12 SOURCE CAPTURED. Local transcription complete: 23,459 words, 3,040 lines,
+126 KB, produced in 324 s of compute (whisper.cpp small.en, Metal). Saved to
+artifacts/source_T12_stanford_lecture_transcript.txt. Read in full.
+IDENTIFICATION (inference, three converging signals, NOT a stated fact — the
+audio never names speaker or course):
+  (i)  "Chris has talked about a linear model" / "Chris is using almost
+       exactly the same notation". Stanford CS229 has been co-taught by
+       Tengyu Ma and Chris Re (cs229.stanford.edu/lectures-spring2022/
+       lecture1.pdf names both).
+  (ii) On counting local minima: "in one of my papers ... by using ... the
+       Kac-Rice formula" (transcript renders it "Cass-Rez").
+  (iii)On residual connections improving conditioning: "including some of my
+       papers".
+=> Stanford CS229, lecturer most likely Tengyu Ma. HIGH-CONFIDENCE INFERENCE.
+BETTER ARTIFACT FOUND: the lecturer says "check the lecture notes" 9 times.
+Those notes are public and current: cs229.stanford.edu/main_notes.pdf,
+updated 2026-08-23 (three days before this run). They carry the equations
+and figures that audio structurally cannot. Promoted above the video for
+study purposes.
+
+L-0019
+Date: 2026-08-26
+Type: correction
+X-012. The "2h34m Stanford class" is TWO lectures stitched, in reverse
+course order.
+  lines    1-1468 (~48%): the LLM lecture — tokenization/BPE, autoregressive
+    chain-rule decomposition, embeddings, logits/softmax, generation with
+    temperature and top-k, NLL loss, then the Transformer: attention, Q/K/V,
+    causal masking, multi-head, residual + norm, T^2 cost, flash attention.
+  lines 1469-3040 (~52%): the PREREQUISITE lecture — non-linear models, loss
+    functions, cross-entropy, GD/SGD, neural nets, ReLU and other
+    activations, ResNet, LayerNorm/RMSNorm, ConvNets.
+The second half precedes the first in the course. Relevant to the operator's
+learning path: start at the midpoint if the opening is heavy.
+
+L-0020
+Date: 2026-08-26
+Type: finding
+LOAD-BEARING. MECHANICAL CAUSE OF F1, upgraded from analogy to mechanism.
+Transcript (lines ~371-408, ~944-954): at every position the network emits
+logits over the full vocabulary and "you take a softmax, you get a
+probability vector ... the sum of the entries is one, and all of the entries
+are non-negative." Vocabulary size stated on the order of 250,000.
+=> The output distribution is ALWAYS complete and ALWAYS normalized. It
+contains NO null entry. A gate phrased "can the model think of another
+question?" is sampling from a machine whose output space does not contain
+"no". THE GATE HAS NO FALSE BRANCH.
+This reframes E8 entirely. E8 is not a strict gate the run failed to
+satisfy; it is a gate whose NO wire was never connected. Corroborated by the
+operator's own history: E8 never converged in three passes and what ended it
+was a hand-typed cap.
+FIX (structural, not a stronger instruction): converge on COVERAGE OVER A
+CLOSED LIST enumerated at E5. A finite set can be exhausted; a normalized
+distribution cannot be emptied. Demote "I thought of another question" from
+gate to logged signal. Same fix the Pocock audit named ("ends when the
+frontier is empty"), now with a mechanical reason instead of an analogy.
+
+L-0021
+Date: 2026-08-26
+Type: finding
+L-E GETS A ONE-SENTENCE MECHANICAL BASIS. Transcript lines ~706-733: the
+training objective is the negative log likelihood, and the lecturer is
+explicit that the indexed token "is a particular choice of x_t ... which is
+seen in the data."
+=> The objective maximizes the probability assigned to THE TOKEN THAT
+ACTUALLY APPEARED IN THE TRAINING TEXT. Not the true token. TRUTH IS NOT A
+TERM IN THE LOSS FUNCTION.
+Consequence: fluency and hallucination are the same optimization. A
+confident well-formed false sentence is the system working as designed.
+This also explains the operator's batch-4 result (catch rate for stale
+evidence flat across a 15x price range): checking staleness requires going
+and looking, and sampling from a conditional distribution has no lookup
+step. A better model predicts better and still does not look. Tier 0
+mechanical-first is therefore correct for a structural reason, not just an
+empirical one.
+
+L-0022
+Date: 2026-08-26
+Type: finding
+L-B / CONTEXT_HYGIENE GET A COST BASIS. Transcript lines ~1399-1426: "the
+number of operations is T squared times d_h ... if you have capital T being
+a million, it's gonna take a million times square operations, which is
+prohibitive." And directly: "when you are using [ChatGPT] or [Claude Code],
+you see the context, and then after some point, they say, let me compact my
+context. And the reason is that you have to shrink the context, otherwise
+your computational efficiency is too bad." Naive attention memory is also
+T^2; flash attention exists to reduce it.
+=> Context cost is QUADRATIC, not linear. The operator's 474k-token session
+was expensive on a curve.
+RESOLUTION OF AN APPARENT CONFLICT: long context is expensive, BUT the
+operator's ACE finding measured compression dropping accuracy 66.7 -> 57.1
+(below never learning) and Meta-Harness Table 3 measured raw logs 50.0 vs a
+summary of the same logs 34.9. So the answer is NOT "summarize the ledger."
+It is KEEP THE LEDGER WHOLE ON DISK AND LOAD ONLY THE ROWS NEEDED. Cheap and
+lossless simultaneously, because the expensive resource is context length,
+not disk. Names the engine's real ledger defect: storage pretending to be
+retrieval.
+
+L-0023
+Date: 2026-08-26
+Type: finding
+NEW MECHANISM THE ENGINE NEVER MENTIONS: TEMPERATURE. Transcript lines
+~560-702. Logits are divided by tau before the softmax; ranking is
+unchanged, sharpness is not. tau -> 0: "your generation will just be always
+deterministic, every time you take the largest most likely token." tau > 1:
+"more softer, so that you focus more on the long tail ... more stochasticity
+and uncertainty." Also top-k: keep k most likely, drop the rest, renormalize.
+Zero occurrences of temperature in the engine's 57 spec files.
+THREE CONSEQUENCES:
+ 1. Stages want different temperatures. E6 battery and E8 adversarial pass
+    want diversity (higher tau); E7 deterministic checks, parsers, and all
+    verification want reproducibility (tau = 0). They currently all run at
+    the session default.
+ 2. REAL BUG IN M8: re-running a check at tau > 0 and getting the same
+    answer is NOT corroboration. Two samples from one distribution agreeing
+    shows the distribution is peaked, not that the peak is correctly placed.
+    Independence must come from a different lens or a different family,
+    never from resampling.
+ 3. Sharpens Tier 0: executing is deterministic by nature; anything opined
+    must be labeled with the temperature it was opined at.
+
+L-0024
+Date: 2026-08-26
+Type: finding
+STRONGEST CULTURAL EVIDENCE FOR L-E, from a domain expert, unprompted. Six
+hedges in 2.5 hours of frontier material (grep-verified, line numbers in
+transcript):
+  880  attention          "Nobody really know exactly how it works."
+  2594 activations        "exactly why I use any of this is kind of like a magic."
+  2935 RMSNorm            "I think it's mostly empirical."
+  2826 ResNet block depth "for reasons we don't fundamentally understand"
+  2038 local minima       "nobody really knows exactly whether they are right"
+  174  Claude tokenizer   "I didn't verify it myself ... Assuming they are true"
+The last is a rumor about Claude's tokenizer becoming more granular. NOT
+verified by this run and NOT repeated as fact anywhere in the deliverable.
+CONTRAST WITH T11: same subject matter, opposite epistemic register. The
+lecture says the field is substantially empirical and names which parts are
+unexplained. The article narrates a clean five-stage pipeline with zero
+uncertainty and got 108,800 views. The article was produced by asking a
+model to reword an existing article "to reduce similarity" (residue visible
+4x in the published text). Somewhere in that rewrite every hedge died.
+=> SHARPEST FORM OF THE META-HARNESS TABLE 3 RESULT: summaries do not merely
+lose detail, THEY LOSE EPISTEMIC MARKERS FIRST, because "nobody knows why
+this works" is precisely the sentence a fluency-optimized rewrite smooths
+into "this works because."
+NEW REQUIREMENT for the two-register output (F8): the human brief MUST CARRY
+THE MACHINE RECORD'S UNCERTAINTY. A brief that reads more confident than its
+ledger has failed. That is a lint, not a mood.
+
+L-0025
+Date: 2026-08-26
+Type: correction
+X-010. SELF-CORRECTION ON THIS RUN'S OWN v1 DELIVERABLE. REPORT v1 section 4
+mapped all five laws to LLM training stages at uniform confidence, using the
+T11 article's five-stage framing. The T12 lecture covers ONLY stages 1-2
+(data/tokenization and pretraining) plus architecture. It never reaches
+supervised fine-tuning, reward modeling, or RLHF.
+=> L-D, L-E, L-B, L-C mappings are now LECTURE-GRADE (L-0020..L-0022).
+   The L-A mapping (sycophancy from reward modeling + RLHF) remains
+   ARTICLE-GRADE, i.e. the demoted low-provenance source.
+Flagged explicitly in REPORT v2 section 5.5 rather than smoothed, because
+presenting five mappings at one confidence level is the exact flattening
+that entry L-0024 is about. Refusing to do it inside the document that
+criticises it is the minimum bar.
+
+L-0027
+Date: 2026-08-26
+Type: correction
+INSTRUMENT BUG IN THIS RUN'S OWN L-B INTEGRITY CHECK. Caught live, worth
+recording because the naive version will be written into CI otherwise.
+L-B invariant (i) requires: number of Index rows == highest Ledger ID. The
+obvious implementation is
+    grep -c '^L-0' memory/LEDGER.md
+It reported 27 entries against 26 Index rows and the invariant appeared to
+FAIL. It had not. Entry L-0025's body text wrapped such that a continuation
+line began with the characters "L-0024", and the count picked it up as a
+27th entry. Twenty-six real entries, twenty-six rows, invariant HOLDS.
+CLASS OF DEFECT: a line-anchored regex over a file that contains prose about
+its own IDs. Same shape as the operator's batch-4 discovery that GitHub code
+search silently under-returns multi-term OR queries — the instrument lied and
+the conclusion drawn from it was void.
+CONSEQUENCE FOR THE BUILD: when L-B's four invariants are implemented as the
+CI script recommended in REPORT section 10, counting entries by line-anchored
+grep is WRONG. Parse entries by their full record shape (an ID line followed
+by a `Date:` line and a `Type:` line), or write the Ledger in a format that
+cannot be confused with its own contents. A miscounting integrity check that
+fails spuriously gets disabled by the third false alarm, and a disabled check
+is a fail-open check.
+NOTE ON DIRECTION OF FAILURE: this instrument failed LOUD (false alarm),
+which is the safe direction. The dangerous variant is an entry whose ID line
+is missed, which under-counts and lets a real gap pass silently. Both are
+fixed by parsing the record, not the line.
+
+L-0026
+Date: 2026-08-26
+Type: decision
+E8 RE-CONVERGENCE after the T12 source correction. VERDICT: CONVERGED
+(decision-mode, decision-saturation).
+The source change did not reopen the decision; it strengthened the evidence
+under four of five sub-answers and forced two self-corrections (X-010,
+X-011). Two NEW build items were added on lecture evidence (temperature
+discipline, target-confirmation gate) and one existing item was upgraded
+from analogy to mechanism (the stop rule).
+Open sub-questions unchanged and still not decision-changing: S8 (harness
+scope assumed, not confirmed), S10 (no cross-family path on this host), S11
+(prior session's own files unreachable). Two new ceilings recorded: the
+small.en transcription instrument, and audio-only capture losing all board
+work in a heavily visual lecture.
+Route: E11 Route B. REPORT.md revised to v2 and pushed.
