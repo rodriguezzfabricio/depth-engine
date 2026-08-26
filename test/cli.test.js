@@ -16,9 +16,10 @@ test('CLI init --dir drops payload and prints summary, exit 0', () => {
   assert.match(out, /BOOT\.md/); // next-step hint names the boot file
 });
 
-test('CLI --help exits 0 and mentions init', () => {
+test('CLI --help exits 0 and mentions init and start', () => {
   const out = execFileSync('node', [BIN, '--help'], { encoding: 'utf8' });
   assert.match(out, /init/);
+  assert.match(out, /start/);
 });
 
 test('CLI --version prints the package version', () => {
